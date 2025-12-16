@@ -1,13 +1,8 @@
-import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_
+// Usiamo il valore diretto per saltare ogni problema di configurazione
+const supabaseUrl = 'https://obosxrxnkpbaefwyoghu.supabase.com'
+const supabaseAnon = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9ib3N4cnhua3BiYWVmd3lvZ2h1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU4MzMyNTEsImV4cCI6MjA4MTQwOTI1MX0.n0hde7ESz1rnuOuTf_QWSe4G_zwKb7sDd6jIMAIxX5Y'
 
-if (!supabaseUrl || !supabaseKey) {
-  throw new Error(
-    'Supabase credentials are missing. Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_ in your .env file.'
-  )
-}
-
-export const supabase: SupabaseClient = createClient(supabaseUrl, supabaseKey)
+export const supabase = createClient(supabaseUrl, supabaseAnon)
 
