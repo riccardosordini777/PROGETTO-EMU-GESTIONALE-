@@ -3,6 +3,7 @@ import { supabase } from './lib/supabaseClient'
 
 function App() {
   const [session, setSession] = useState<any>(null)
+  const [orders, setOrders] = useState<any[]>([]) 
   const [userName, setUserName] = useState('') 
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -14,11 +15,21 @@ function App() {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
         setSession(session)
-        const savedName = localStorage.getItem('emu_user_name')
-        if (savedName) setUserName(savedName)
+        fetchOrders()
       }
     })
   }, [])
+
+  const fetchOrders = async () => {
+    // Recupera i dati veri (ANTIGUA, COLLIER, ecc.)
+    const { data, error } = await supabase
+      .from('orders')
+      .select('*')
+      .order('created_at', { ascending: false })
+    
+    if (error) console.error('Errore:', error)
+    else setOrders(data || [])
+  }
 
   const handleLogin = async (e: any) => {
     e.preventDefault()
@@ -31,7 +42,7 @@ function App() {
     })
 
     if (error) {
-      setErrorMsg('Credenziali non valide.')
+      setErrorMsg('Password errata. Riprova.')
       setLoading(false)
     } else {
       localStorage.setItem('emu_user_name', userName)
@@ -45,29 +56,32 @@ function App() {
     window.location.reload()
   }
 
-  // --- LOGIN (Manteniamo quello che funziona) ---
+  // --- LOGIN (Il nuovo login che funziona e ha il logo) ---
   if (!session) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', backgroundColor: '#f1f5f9', fontFamily: "'Segoe UI', sans-serif" }}>
-        <div style={{ backgroundColor: 'white', padding: '3rem', borderRadius: '16px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', width: '100%', maxWidth: '420px', textAlign: 'center' }}>
-          {/* Logo Login */}
-          <div style={{ marginBottom: '2rem' }}>
-             <img src="/emu.1.png" alt="EMU" style={{ height: '40px', display: 'block', margin: '0 auto' }} />
-          </div>
-          <h2 style={{ color: '#0f172a', fontSize: '1.5rem', fontWeight: '700', margin: '0 0 0.5rem 0' }}>Commercial Hub</h2>
-          <p style={{ color: '#64748b', marginBottom: '2rem' }}>Area riservata agenti e rivenditori</p>
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', backgroundColor: '#f8fafc', fontFamily: "'Segoe UI', sans-serif" }}>
+        <div style={{ backgroundColor: 'white', padding: '3rem', borderRadius: '12px', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)', width: '100%', maxWidth: '400px', textAlign: 'center' }}>
           
-          <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          <div style={{ marginBottom: '2rem' }}>
+             <img src="/emu.1.png" alt="EMU" style={{ height: '50px', display: 'block', margin: '0 auto' }} />
+          </div>
+          
+          <h2 style={{ color: '#0f172a', fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>Commercial Hub</h2>
+          <p style={{ color: '#64748b', marginBottom: '2rem' }}>Area riservata agenti</p>
+          
+          <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             <div style={{ textAlign: 'left' }}>
-              <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '600', color: '#334155', marginBottom: '0.5rem' }}>Nome Operatore</label>
-              <input type="text" placeholder="Es. Riccardo S." value={userName} onChange={(e) => setUserName(e.target.value)} style={{ width: '100%', padding: '0.875rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '1rem', boxSizing: 'border-box' }} required />
+              <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: '600', color: '#334155', marginBottom: '0.5rem' }}>Nome Operatore</label>
+              <input type="text" placeholder="Es. Riccardo" value={userName} onChange={(e) => setUserName(e.target.value)} style={{ width: '100%', padding: '0.8rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '1rem', boxSizing: 'border-box' }} required />
             </div>
+            
             <div style={{ textAlign: 'left' }}>
-              <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '600', color: '#334155', marginBottom: '0.5rem' }}>Password Accesso</label>
-              <input type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} style={{ width: '100%', padding: '0.875rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '1rem', boxSizing: 'border-box' }} required />
+              <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: '600', color: '#334155', marginBottom: '0.5rem' }}>Password</label>
+              <input type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} style={{ width: '100%', padding: '0.8rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '1rem', boxSizing: 'border-box' }} required />
             </div>
-            <button type="submit" disabled={loading} style={{ backgroundColor: '#003366', color: 'white', padding: '1rem', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', fontSize: '1rem', marginTop: '0.5rem' }}>
-              {loading ? 'Accesso in corso...' : 'Entra nel Gestionale'}
+
+            <button type="submit" disabled={loading} style={{ backgroundColor: '#003366', color: 'white', padding: '1rem', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '1rem', marginTop: '1rem' }}>
+              {loading ? 'Accesso...' : 'Accedi'}
             </button>
             {errorMsg && <p style={{ color: '#dc2626', fontSize: '0.9rem', marginTop: '0.5rem' }}>{errorMsg}</p>}
           </form>
@@ -76,54 +90,63 @@ function App() {
     )
   }
 
-  // --- DASHBOARD (ESATTAMENTE COME PRIMA - RESTORE) ---
+  // --- DASHBOARD (La PRIMA versione: con la tabella dati VISIBILE) ---
   return (
     <div style={{ fontFamily: "'Segoe UI', sans-serif", backgroundColor: '#ffffff', minHeight: '100vh' }}>
-      {/* Navbar Minimalista Originale */}
+      
+      {/* Navbar "Polo commerciale" */}
       <nav style={{ borderBottom: '1px solid #e2e8f0', padding: '1rem 2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <h1 style={{ color: '#003366', margin: 0, fontSize: '1.8rem', fontWeight: '900', letterSpacing: '-1px' }}>EMU</h1>
+          <img src="/emu.1.png" alt="EMU" style={{ height: '28px' }} />
           <span style={{ height: '24px', width: '1px', backgroundColor: '#e2e8f0' }}></span>
-          <span style={{ color: '#64748b', fontSize: '1rem' }}>Polo commerciale</span>
+          <span style={{ color: '#64748b', fontSize: '1rem', fontWeight: '500' }}>Polo commerciale</span>
         </div>
         
         <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
-          <div style={{ textAlign: 'right' }}>
-            <span style={{ display: 'block', color: '#0f172a', fontWeight: '600', fontSize: '0.9rem' }}>{localStorage.getItem('emu_user_name')}</span>
-            <span style={{ display: 'block', color: '#94a3b8', fontSize: '0.8rem' }}>Operatore</span>
-          </div>
-          <button 
-            onClick={handleLogout} 
-            style={{ 
-              backgroundColor: 'white', 
-              color: '#64748b', 
-              border: '1px solid #e2e8f0', 
-              padding: '0.5rem 1rem', 
-              borderRadius: '6px', 
-              cursor: 'pointer',
-              fontWeight: '500',
-              fontSize: '0.9rem'
-            }}
-          >
-            Esci
-          </button>
+          <span style={{ color: '#0f172a', fontWeight: '600' }}>{localStorage.getItem('emu_user_name')}</span>
+          <button onClick={handleLogout} style={{ border: '1px solid #cbd5e1', background: 'white', padding: '0.5rem 1rem', borderRadius: '4px', cursor: 'pointer', color: '#475569' }}>Esci</button>
         </div>
       </nav>
 
-      <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '3rem 2rem' }}>
-        <h2 style={{ color: '#0f172a', fontSize: '2.5rem', fontWeight: '400', marginBottom: '0.5rem' }}>Dashboard Vendite</h2>
-        <p style={{ color: '#94a3b8', fontSize: '1.1rem', marginBottom: '3rem' }}>Benvenuto nel pannello di controllo.</p>
-        
-        {/* Il box bianco vuoto originale */}
-        <div style={{ 
-          backgroundColor: 'white', 
-          borderRadius: '12px', 
-          border: '1px solid #e2e8f0', 
-          padding: '4rem', 
-          textAlign: 'center',
-          boxShadow: '0 4px 6px -1px rgba(0,0,0,0.02)' 
-        }}>
-          <p style={{ color: '#cbd5e1', fontSize: '1.2rem' }}>Dati in corso...</p>
+      {/* Contenuto con TABELLA (Niente scritte "dati in corso") */}
+      <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '3rem 2rem' }}>
+        <h2 style={{ fontSize: '2rem', fontWeight: '300', color: '#0f172a', marginBottom: '2rem' }}>Ordini Recenti</h2>
+
+        <div style={{ border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+            <thead style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+              <tr>
+                <th style={{ padding: '1rem', fontSize: '0.85rem', color: '#64748b', fontWeight: '600', textTransform: 'uppercase' }}>Cliente</th>
+                <th style={{ padding: '1rem', fontSize: '0.85rem', color: '#64748b', fontWeight: '600', textTransform: 'uppercase' }}>Collezione</th>
+                <th style={{ padding: '1rem', fontSize: '0.85rem', color: '#64748b', fontWeight: '600', textTransform: 'uppercase' }}>Importo</th>
+                <th style={{ padding: '1rem', fontSize: '0.85rem', color: '#64748b', fontWeight: '600', textTransform: 'uppercase' }}>Stato</th>
+              </tr>
+            </thead>
+            <tbody>
+              {orders.length > 0 ? (
+                orders.map((order) => (
+                  <tr key={order.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                    <td style={{ padding: '1rem', fontWeight: '500', color: '#0f172a' }}>{order.client_name}</td>
+                    <td style={{ padding: '1rem', color: '#64748b' }}>{order.product_line}</td>
+                    <td style={{ padding: '1rem', color: '#64748b' }}>€ {order.amount}</td>
+                    <td style={{ padding: '1rem' }}>
+                      <span style={{ 
+                        backgroundColor: order.status === 'Confermato' ? '#dcfce7' : '#fef9c3', 
+                        color: order.status === 'Confermato' ? '#166534' : '#854d0e',
+                        padding: '0.25rem 0.75rem', borderRadius: '20px', fontSize: '0.8rem', fontWeight: '600' 
+                      }}>
+                        {order.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={4} style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>Nessun ordine trovato.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
