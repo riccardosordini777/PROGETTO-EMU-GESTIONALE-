@@ -94,7 +94,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Ensure a profile exists for this user
     const { error: profileError } = await supabase
       .from('profiles')
-      .upsert({ id: localUserId, full_name: nextUsername }, { onConflict: 'id' })
+      .upsert(
+        {
+          id: localUserId,
+          full_name: nextUsername,
+          email: `${localUserId}@email.placeholder`,
+        },
+        { onConflict: 'id' }
+      )
 
     if (profileError) {
       console.error('Error saving profile:', profileError)

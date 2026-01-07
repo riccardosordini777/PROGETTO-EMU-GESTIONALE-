@@ -379,6 +379,7 @@ function VibeSelector({ activeMood }: { activeMood: MoodStatus | string | null }
         .upsert({
           id: localUserId,
           full_name: username ?? 'Operatore',
+          email: `${localUserId}@email.placeholder`, // Ensure email is not null
           mood_status: mood,
           updated_at: new Date().toISOString(),
         })
