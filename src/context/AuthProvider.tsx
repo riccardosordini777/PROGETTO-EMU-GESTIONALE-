@@ -38,7 +38,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (session) {
         setSessionUserId(session.user.id)
         setSessionUserEmail(session.user.email ?? null)
-        setAuthenticated(true)
+        // IMPORTANT: Do not set authenticated here.
+        // Authentication must happen through the signIn function to ensure
+        // the user profile is created.
       }
     })
 
@@ -48,7 +50,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (session) {
         setSessionUserId(session.user.id)
         setSessionUserEmail(session.user.email ?? null)
-        setAuthenticated(true)
       } else {
         setSessionUserId(null)
         setSessionUserEmail(null)

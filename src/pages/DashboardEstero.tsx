@@ -66,7 +66,6 @@ async function fetchEsteroProjects(): Promise<Project[]> {
 
 export function DashboardEstero() {
   const { username, sessionUserId, localUserId, signOut } = useAuth()
-  console.log('[DashboardEstero] Rendered with localUserId:', localUserId)
   const queryClient = useQueryClient()
   const [sheetOpen, setSheetOpen] = useState(false)
   const [editing, setEditing] = useState<Project | null>(null)
@@ -443,7 +442,6 @@ function ProjectSheetEstero({
   localUserId: string
   onSaved: () => void
 }) {
-  console.log('[ProjectSheetEstero] Rendering with localUserId prop:', localUserId)
   const isEditing = Boolean(project)
   const [form, setForm] = useState<Project>(
     project ?? {
@@ -506,7 +504,6 @@ function ProjectSheetEstero({
     try {
       if (!localUserId) throw new Error('User not authenticated for saving.')
       const payload = { ...form, user_id: localUserId }
-      console.log('[ProjectSheetEstero] Submitting project with payload:', payload)
       const { error } = await supabase.from('projects').upsert(payload)
       if (error) {
         throw error
