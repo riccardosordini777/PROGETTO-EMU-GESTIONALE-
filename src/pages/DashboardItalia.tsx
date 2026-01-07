@@ -77,6 +77,7 @@ async function fetchProfiles(): Promise<Profile[]> {
 
 export function DashboardItalia() {
   const { username, sessionUserId, localUserId, signOut } = useAuth()
+  console.log('[DashboardItalia] Rendered with localUserId:', localUserId)
   const queryClient = useQueryClient()
   const [sheetOpen, setSheetOpen] = useState(false)
   const [editing, setEditing] = useState<Project | null>(null)
@@ -369,17 +370,16 @@ export function DashboardItalia() {
 }
 
 function VibeSelector({ activeMood }: { activeMood: MoodStatus | string | null }) {
-  const { username, sessionUserId, sessionUserEmail } = useAuth()
+  const { username, localUserId } = useAuth()
   const queryClient = useQueryClient()
   const [updating, setUpdating] = useState(false)
   const mutation = useMutation({
     mutationFn: async (mood: MoodStatus) => {
-      if (!sessionUserId) throw new Error('User not authenticated')
+      if (!localUserId) throw new Error('User not authenticated')
       const { error } = await supabase
         .from('profiles')
         .upsert({
-          id: sessionUserId,
-          email: sessionUserEmail,
+          id: localUserId,
           full_name: username ?? 'Operatore',
           mood_status: mood,
           updated_at: new Date().toISOString(),
@@ -442,6 +442,7 @@ function ProjectSheet({
   localUserId,
   onSaved,
 }: ProjectSheetProps) {
+  console.log('[ProjectSheet] Rendering with localUserId prop:', localUserId)
   const isEditing = Boolean(project)
   const [form, setForm] = useState<Project>(
     project ?? {
@@ -502,6 +503,7 @@ function ProjectSheet({
     try {
       if (!localUserId) throw new Error('User not authenticated for saving.')
       const payload = { ...form, user_id: localUserId }
+      console.log('[ProjectSheet] Submitting project with payload:', payload)
       const { error } = await supabase.from('projects').upsert(payload)
       if (error) throw error
       onSaved()
