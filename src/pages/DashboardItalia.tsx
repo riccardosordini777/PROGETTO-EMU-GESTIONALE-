@@ -76,7 +76,7 @@ async function fetchProfiles(): Promise<Profile[]> {
 }
 
 export function DashboardItalia() {
-  const { username, sessionUserId, signOut } = useAuth()
+  const { username, sessionUserId, localUserId, signOut } = useAuth()
   const queryClient = useQueryClient()
   const [sheetOpen, setSheetOpen] = useState(false)
   const [editing, setEditing] = useState<Project | null>(null)
@@ -92,8 +92,9 @@ export function DashboardItalia() {
   })
 
   const myMood = useMemo(() => {
-    return profiles.find((p) => p.id === sessionUserId)?.mood_status ?? null
-  }, [profiles, sessionUserId])
+    // Use localUserId to find the current user's profile mood
+    return profiles.find((p) => p.id === localUserId)?.mood_status ?? null
+  }, [profiles, localUserId])
 
   useEffect(() => {
     const channel = supabase
@@ -348,7 +349,7 @@ export function DashboardItalia() {
                       </TableCell>
                     </TableRow>
                   ))}
-                </TableBody>
+                </Body>
               </Table>
             )}
           </CardContent>
@@ -360,6 +361,7 @@ export function DashboardItalia() {
         onOpenChange={setSheetOpen}
         project={editing}
         sessionUserId={sessionUserId}
+        localUserId={localUserId}
         onSaved={() => queryClient.invalidateQueries({ queryKey: ['projects'] })}
       />
     </div>
@@ -367,17 +369,16 @@ export function DashboardItalia() {
 }
 
 function VibeSelector({ activeMood }: { activeMood: MoodStatus | string | null }) {
-  const { username, sessionUserId, sessionUserEmail } = useAuth()
+  const { username, localUserId } = useAuth()
   const queryClient = useQueryClient()
   const [updating, setUpdating] = useState(false)
   const mutation = useMutation({
     mutationFn: async (mood: MoodStatus) => {
-      if (!sessionUserId) throw new Error('User not authenticated')
+      if (!localUserId) throw new Error('User not authenticated')
       const { error } = await supabase
         .from('profiles')
         .upsert({
-          id: sessionUserId,
-          email: sessionUserEmail,
+          id: localUserId,
           full_name: username ?? 'Operatore',
           mood_status: mood,
           updated_at: new Date().toISOString(),
@@ -428,15 +429,23 @@ interface ProjectSheetProps {
   onOpenChange: (open: boolean) => void
   project: Project | null
   sessionUserId: string | null
+  localUserId: string
   onSaved: () => void
 }
 
-function ProjectSheet({ open, onOpenChange, project, sessionUserId, onSaved }: ProjectSheetProps) {
+function ProjectSheet({
+  open,
+  onOpenChange,
+  project,
+  sessionUserId,
+  localUserId,
+  onSaved,
+}: ProjectSheetProps) {
   const isEditing = Boolean(project)
   const [form, setForm] = useState<Project>(
     project ?? {
       id: crypto.randomUUID(),
-      user_id: sessionUserId ?? '',
+      user_id: localUserId ?? '',
       status: 'Open',
       request_date: new Date().toISOString().slice(0, 10),
       client_name: '',
@@ -456,7 +465,7 @@ function ProjectSheet({ open, onOpenChange, project, sessionUserId, onSaved }: P
     } else {
       setForm({
         id: crypto.randomUUID(),
-        user_id: sessionUserId ?? '',
+        user_id: localUserId ?? '',
         status: 'Open',
         request_date: new Date().toISOString().slice(0, 10),
         client_name: '',
@@ -467,7 +476,7 @@ function ProjectSheet({ open, onOpenChange, project, sessionUserId, onSaved }: P
         pdf_url: '',
       })
     }
-  }, [project, sessionUserId, open])
+  }, [project, localUserId, open])
 
   const handleUpload = async (file: File) => {
     setUploading(true)
@@ -490,8 +499,8 @@ function ProjectSheet({ open, onOpenChange, project, sessionUserId, onSaved }: P
     e.preventDefault()
     setSaving(true)
     try {
-      if (!sessionUserId) throw new Error('User not authenticated for saving.')
-      const payload = { ...form, user_id: sessionUserId }
+      if (!localUserId) throw new Error('User not authenticated for saving.')
+      const payload = { ...form, user_id: localUserId }
       const { error } = await supabase.from('projects').upsert(payload)
       if (error) throw error
       onSaved()
