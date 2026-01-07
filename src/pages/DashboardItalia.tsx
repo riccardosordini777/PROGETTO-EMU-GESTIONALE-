@@ -77,7 +77,6 @@ async function fetchProfiles(): Promise<Profile[]> {
 
 export function DashboardItalia() {
   const { username, sessionUserId, localUserId, signOut } = useAuth()
-  console.log('[DashboardItalia] Rendered with localUserId:', localUserId)
   const queryClient = useQueryClient()
   const [sheetOpen, setSheetOpen] = useState(false)
   const [editing, setEditing] = useState<Project | null>(null)
@@ -302,7 +301,56 @@ export function DashboardItalia() {
             {projectsLoading ? (
               <p className="text-sm text-slate-500">Caricamento progetti...</p>
             ) : (
-              <p className="text-sm text-slate-500">Tabella temporaneamente rimossa per debug...</p>
+              <Table>
+                <TableHeader>
+                  <tr>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Request Date</TableHead>
+                    <TableHead>Client</TableHead>
+                    <TableHead>Agent</TableHead>
+                    <TableHead>Project</TableHead>
+                    <TableHead>Value (€)</TableHead>
+                    <TableHead>PDF</TableHead>
+                  </tr>
+                </TableHeader>
+                <TableBody>
+                  {filteredProjects.map((project) => (
+                    <TableRow key={project.id} onClick={() => handleRowClick(project)}>
+                      <TableCell>
+                        <Badge variant={statusVariant[project.status] ?? 'info'}>
+                          {project.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {project.request_date
+                          ? format(new Date(project.request_date), 'dd MMM yyyy', { locale: it })
+                          : '—'}
+                      </TableCell>
+                      <TableCell>{project.client_name}</TableCell>
+                      <TableCell>{project.agent_name}</TableCell>
+                      <TableCell>{project.project_name}</TableCell>
+                      <TableCell className="font-semibold">
+                        € {Number(project.value ?? 0).toLocaleString('it-IT')}
+                      </TableCell>
+                      <TableCell>
+                        {project.pdf_url ? (
+                          <a
+                            href={project.pdf_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-primary hover:underline"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <FileText className="h-5 w-5" />
+                          </a>
+                        ) : (
+                          <span className="text-xs text-slate-400">N/A</span>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             )}
           </CardContent>
         </Card>
@@ -321,16 +369,17 @@ export function DashboardItalia() {
 }
 
 function VibeSelector({ activeMood }: { activeMood: MoodStatus | string | null }) {
-  const { username, localUserId } = useAuth()
+  const { username, sessionUserId, sessionUserEmail } = useAuth()
   const queryClient = useQueryClient()
   const [updating, setUpdating] = useState(false)
   const mutation = useMutation({
     mutationFn: async (mood: MoodStatus) => {
-      if (!localUserId) throw new Error('User not authenticated')
+      if (!sessionUserId) throw new Error('User not authenticated')
       const { error } = await supabase
         .from('profiles')
         .upsert({
-          id: localUserId,
+          id: sessionUserId,
+          email: sessionUserEmail,
           full_name: username ?? 'Operatore',
           mood_status: mood,
           updated_at: new Date().toISOString(),
@@ -393,7 +442,6 @@ function ProjectSheet({
   localUserId,
   onSaved,
 }: ProjectSheetProps) {
-  console.log('[ProjectSheet] Rendering with localUserId prop:', localUserId)
   const isEditing = Boolean(project)
   const [form, setForm] = useState<Project>(
     project ?? {
@@ -454,7 +502,6 @@ function ProjectSheet({
     try {
       if (!localUserId) throw new Error('User not authenticated for saving.')
       const payload = { ...form, user_id: localUserId }
-      console.log('[ProjectSheet] Submitting project with payload:', payload)
       const { error } = await supabase.from('projects').upsert(payload)
       if (error) throw error
       onSaved()
