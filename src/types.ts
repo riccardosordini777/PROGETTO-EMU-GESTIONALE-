@@ -20,5 +20,6 @@ export interface Project {
   value: number
   notes?: string | null
   pdf_url?: string | null
+  Country?: string | null
 }
 

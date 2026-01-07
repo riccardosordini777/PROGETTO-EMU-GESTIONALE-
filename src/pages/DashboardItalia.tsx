@@ -10,23 +10,20 @@ import {
 } from 'recharts'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
-  ArrowUpRight,
   FileText,
-  Filter,
   LogOut,
   Plus,
-  Search,
   Smile,
   UploadCloud,
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { it } from 'date-fns/locale'
-import { Button } from './ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
-import { Input } from './ui/input'
-import { Label } from './ui/label'
-import { Badge } from './ui/badge'
-import { Avatar } from './ui/avatar'
+import { Button } from '../components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
+import { Input } from '../components/ui/input'
+import { Label } from '../components/ui/label'
+import { Badge } from '../components/ui/badge'
+import { Avatar } from '../components/ui/avatar'
 import {
   Table,
   TableBody,
@@ -34,14 +31,15 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from './ui/table'
-import { Select } from './ui/select'
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from './ui/sheet'
-import { Textarea } from './ui/textarea'
+} from '../components/ui/table'
+import { Select } from '../components/ui/select'
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '../components/ui/sheet'
+import { Textarea } from '../components/ui/textarea'
 import { cn } from '../lib/utils'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../context/AuthProvider'
 import type { MoodStatus, Profile, Project } from '../types'
+import { KpiCard } from '../components/KpiCard'
 
 const MOODS: MoodStatus[] = ['🚀', '🎉', '☕', '🛑', '🙂']
 
@@ -52,12 +50,16 @@ const statusVariant: Record<string, 'success' | 'danger' | 'info' | 'warning'> =
   Negotiation: 'warning',
 }
 
-async function fetchProjects(): Promise<Project[]> {
+async function fetchItaliaProjects(): Promise<Project[]> {
   const { data, error } = await supabase
     .from('projects')
     .select('*')
+    .is('Country', null)
     .order('created_at', { ascending: false })
-  if (error) throw error
+  if (error) {
+    console.error('fetchItaliaProjects error', error)
+    throw error
+  }
   return (data ?? []) as Project[]
 }
 
@@ -66,27 +68,32 @@ async function fetchProfiles(): Promise<Profile[]> {
     .from('profiles')
     .select('*')
     .order('updated_at', { ascending: false })
-  if (error) throw error
+  if (error) {
+    console.error('fetchProfiles error', error)
+    throw error
+  }
   return (data ?? []) as Profile[]
 }
 
-export function Dashboard() {
-  const { user, profile, signOut } = useAuth()
+export function DashboardItalia() {
+  const { username, sessionUserId, signOut } = useAuth()
   const queryClient = useQueryClient()
-  const [search, setSearch] = useState('')
-  const [agentFilter, setAgentFilter] = useState('all')
   const [sheetOpen, setSheetOpen] = useState(false)
   const [editing, setEditing] = useState<Project | null>(null)
 
   const { data: projects = [], isLoading: projectsLoading } = useQuery({
     queryKey: ['projects'],
-    queryFn: fetchProjects,
+    queryFn: fetchItaliaProjects,
   })
 
   const { data: profiles = [], isLoading: profilesLoading } = useQuery({
     queryKey: ['profiles'],
     queryFn: fetchProfiles,
   })
+
+  const myMood = useMemo(() => {
+    return profiles.find((p) => p.id === sessionUserId)?.mood_status ?? null
+  }, [profiles, sessionUserId])
 
   useEffect(() => {
     const channel = supabase
@@ -114,17 +121,10 @@ export function Dashboard() {
   }, [queryClient])
 
   const filteredProjects = useMemo(() => {
-    return projects.filter((project) => {
-      const matchSearch =
-        project.client_name.toLowerCase().includes(search.toLowerCase()) ||
-        project.project_name.toLowerCase().includes(search.toLowerCase())
-      const matchAgent = agentFilter === 'all' || project.agent_name === agentFilter
-      return matchSearch && matchAgent
+    return projects.filter(() => {
+      // For now, no specific filtering beyond initial fetch for Italia
+      return true
     })
-  }, [agentFilter, projects, search])
-
-  const agents = useMemo(() => {
-    return Array.from(new Set(projects.map((p) => p.agent_name)))
   }, [projects])
 
   const pipelineValue = projects
@@ -174,11 +174,11 @@ export function Dashboard() {
           <div className="flex items-center gap-3">
             <div className="text-right">
               <p className="text-sm font-semibold text-slate-900">
-                {profile?.full_name ?? user?.email}
+                {username ?? 'Operatore'}
               </p>
               <p className="text-xs text-slate-500">Accesso protetto</p>
             </div>
-            <Avatar name={profile?.full_name ?? user?.email ?? 'User'} />
+            <Avatar name={username ?? 'User'} />
             <Button variant="outline" size="sm" onClick={() => signOut()}>
               <LogOut className="h-4 w-4" />
               Esci
@@ -198,7 +198,7 @@ export function Dashboard() {
               <CardTitle className="text-2xl">Come si sente il team oggi?</CardTitle>
             </CardHeader>
             <CardContent className="flex flex-col gap-5">
-              <VibeSelector />
+              <VibeSelector activeMood={myMood} />
               <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
                 {profilesLoading && <p className="text-sm text-slate-500">Aggiornamento...</p>}
                 {!profilesLoading &&
@@ -295,28 +295,6 @@ export function Dashboard() {
                 Nuovo progetto
               </Button>
             </div>
-            <div className="flex flex-wrap gap-3">
-              <div className="relative flex-1 min-w-[220px]">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                <Input
-                  placeholder="Cerca cliente o progetto..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="pl-9"
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <Filter className="h-4 w-4 text-slate-400" />
-                <Select value={agentFilter} onChange={(e) => setAgentFilter(e.target.value)}>
-                  <option value="all">Tutti gli agenti</option>
-                  {agents.map((agent) => (
-                    <option key={agent} value={agent}>
-                      {agent}
-                    </option>
-                  ))}
-                </Select>
-              </div>
-            </div>
           </CardHeader>
           <CardContent>
             {projectsLoading ? (
@@ -381,28 +359,33 @@ export function Dashboard() {
         open={sheetOpen}
         onOpenChange={setSheetOpen}
         project={editing}
-        userId={user?.id ?? ''}
+        sessionUserId={sessionUserId}
         onSaved={() => queryClient.invalidateQueries({ queryKey: ['projects'] })}
       />
     </div>
   )
 }
 
-function VibeSelector() {
-  const { user, profile, refreshProfile } = useAuth()
+function VibeSelector({ activeMood }: { activeMood: MoodStatus | string | null }) {
+  const { username, sessionUserId, sessionUserEmail } = useAuth()
   const queryClient = useQueryClient()
   const [updating, setUpdating] = useState(false)
   const mutation = useMutation({
     mutationFn: async (mood: MoodStatus) => {
+      if (!sessionUserId) throw new Error('User not authenticated')
       const { error } = await supabase
         .from('profiles')
-        .update({ mood_status: mood, updated_at: new Date().toISOString() })
-        .eq('id', user?.id)
+        .upsert({
+          id: sessionUserId,
+          email: sessionUserEmail,
+          full_name: username ?? 'Operatore',
+          mood_status: mood,
+          updated_at: new Date().toISOString(),
+        })
       if (error) throw error
       return mood
     },
     onSuccess: async () => {
-      await refreshProfile()
       await queryClient.invalidateQueries({ queryKey: ['profiles'] })
     },
     onSettled: () => setUpdating(false),
@@ -418,7 +401,7 @@ function VibeSelector() {
       <p className="text-sm font-semibold text-slate-800">Seleziona il tuo mood</p>
       <div className="mt-3 flex flex-wrap gap-2">
         {MOODS.map((mood) => {
-          const active = profile?.mood_status === mood
+          const active = activeMood === mood
           return (
             <button
               key={mood}
@@ -440,55 +423,20 @@ function VibeSelector() {
   )
 }
 
-function KpiCard({
-  title,
-  value,
-  description,
-  suffix,
-}: {
-  title: string
-  value: number
-  description: string
-  suffix?: string
-}) {
-  return (
-    <Card>
-      <CardHeader className="flex flex-row items-start justify-between">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">
-            {title}
-          </p>
-          <CardTitle className="text-3xl">
-            {suffix ? (
-              <span>
-                {value} <span className="text-base text-slate-500">{suffix}</span>
-              </span>
-            ) : (
-              `€ ${value.toLocaleString('it-IT')}`
-            )}
-          </CardTitle>
-        </div>
-        <ArrowUpRight className="h-5 w-5 text-slate-400" />
-      </CardHeader>
-      <CardContent className="text-sm text-slate-600">{description}</CardContent>
-    </Card>
-  )
-}
-
 interface ProjectSheetProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   project: Project | null
-  userId: string
+  sessionUserId: string | null
   onSaved: () => void
 }
 
-function ProjectSheet({ open, onOpenChange, project, userId, onSaved }: ProjectSheetProps) {
+function ProjectSheet({ open, onOpenChange, project, sessionUserId, onSaved }: ProjectSheetProps) {
   const isEditing = Boolean(project)
   const [form, setForm] = useState<Project>(
     project ?? {
       id: crypto.randomUUID(),
-      user_id: userId,
+      user_id: sessionUserId ?? '',
       status: 'Open',
       request_date: new Date().toISOString().slice(0, 10),
       client_name: '',
@@ -508,7 +456,7 @@ function ProjectSheet({ open, onOpenChange, project, userId, onSaved }: ProjectS
     } else {
       setForm({
         id: crypto.randomUUID(),
-        user_id: userId,
+        user_id: sessionUserId ?? '',
         status: 'Open',
         request_date: new Date().toISOString().slice(0, 10),
         client_name: '',
@@ -519,12 +467,13 @@ function ProjectSheet({ open, onOpenChange, project, userId, onSaved }: ProjectS
         pdf_url: '',
       })
     }
-  }, [project, userId, open])
+  }, [project, sessionUserId, open])
 
   const handleUpload = async (file: File) => {
     setUploading(true)
     try {
-      const path = `${userId}/${Date.now()}-${file.name}`
+      if (!sessionUserId) throw new Error('User not authenticated for upload.')
+      const path = `${sessionUserId}/${Date.now()}-${file.name}`
       const { error } = await supabase.storage.from('project-pdfs').upload(path, file)
       if (error) throw error
       const { data } = supabase.storage.from('project-pdfs').getPublicUrl(path)
@@ -541,14 +490,26 @@ function ProjectSheet({ open, onOpenChange, project, userId, onSaved }: ProjectS
     e.preventDefault()
     setSaving(true)
     try {
-      const payload = { ...form, user_id: userId }
+      if (!sessionUserId) throw new Error('User not authenticated for saving.')
+      const payload = { ...form, user_id: sessionUserId }
       const { error } = await supabase.from('projects').upsert(payload)
       if (error) throw error
       onSaved()
       onOpenChange(false)
     } catch (err) {
       console.error(err)
-      alert('Errore durante il salvataggio del progetto')
+      const e = err as { message?: string; details?: string; hint?: string; code?: string }
+      alert(
+        [
+          'Errore durante il salvataggio del progetto',
+          e.code ? `code: ${e.code}` : null,
+          e.message ? `message: ${e.message}` : null,
+          e.details ? `details: ${e.details}` : null,
+          e.hint ? `hint: ${e.hint}` : null,
+        ]
+          .filter(Boolean)
+          .join('\n')
+      )
     } finally {
       setSaving(false)
     }
@@ -668,4 +629,3 @@ function ProjectSheet({ open, onOpenChange, project, userId, onSaved }: ProjectS
     </Sheet>
   )
 }
-
