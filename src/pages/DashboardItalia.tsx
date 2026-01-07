@@ -350,7 +350,7 @@ export function DashboardItalia() {
                       </TableCell>
                     </TableRow>
                   ))}
-                </Body>
+                </TableBody>
               </Table>
             )}
           </CardContent>
