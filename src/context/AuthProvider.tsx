@@ -92,20 +92,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     // Ensure a profile exists for this user
-    const { error: profileError } = await supabase
+    const { data: existingProfile, error: selectError } = await supabase
       .from('profiles')
-      .upsert(
-        {
-          id: localUserId,
-          full_name: nextUsername,
-          email: `${localUserId}@email.placeholder`,
-        },
-        { onConflict: 'id' }
-      )
+      .select('id')
+      .eq('id', localUserId)
+      .single()
 
-    if (profileError) {
-      console.error('Error saving profile:', profileError)
-      throw new Error('Errore durante il salvataggio del profilo utente.')
+    if (selectError && selectError.code !== 'PGRST116') {
+      console.error('Error checking for profile:', selectError)
+      throw new Error('Errore durante la verifica del profilo utente.')
+    }
+    
+    if (!existingProfile) {
+      // Profile does not exist, create it
+      const { error: insertError } = await supabase.from('profiles').insert({
+        id: localUserId,
+        full_name: nextUsername,
+        email: `${localUserId}@email.placeholder`,
+      })
+
+      if (insertError) {
+        console.error('Error creating profile:', insertError)
+        throw new Error('Errore durante la creazione del profilo utente.')
+      }
     }
 
     // If Supabase login is successful, proceed with the "simple login" experience
