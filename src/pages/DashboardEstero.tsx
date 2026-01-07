@@ -622,145 +622,19 @@ export function DashboardEstero() {
 
           </CardHeader>
 
-          <CardContent>
+                    <CardContent>
 
-            {projectsLoading ? (
+                      {projectsLoading ? (
 
-              <p className="text-sm text-slate-500">Caricamento progetti...</p>
+                        <p className="text-sm text-slate-500">Caricamento progetti...</p>
 
-            ) : (
+                      ) : (
 
-              <Table>
+                        <p className="text-sm text-slate-500">Tabella temporaneamente rimossa per debug...</p>
 
-                <TableHeader>
+                      )}
 
-                  <tr>
-
-                    <TableHead>Paese</TableHead>
-
-                    <TableHead>Status</TableHead>
-
-                    <TableHead>Request Date</TableHead>
-
-                    <TableHead>Client</TableHead>
-
-                    <TableHead>Agent</TableHead>
-
-                    <TableHead>Project</TableHead>
-
-                    <TableHead>Value (€)</TableHead>
-
-                    <TableHead>PDF</TableHead>
-
-                  </tr>
-
-                </TableHeader>
-
-                <TableBody>
-
-                  {filteredProjects.map((project) => {
-
-                    const countryCode = getCountryCode(project.Country || '');
-
-                    return (
-
-                      <TableRow key={project.id} onClick={() => handleRowClick(project)}>
-
-                        <TableCell>
-
-                          {countryCode ? (
-
-                            <span className="flex items-center gap-2">
-
-                              <ReactCountryFlag countryCode={countryCode} svg />
-
-                              {project.Country}
-
-                            </span>
-
-                          ) : (
-
-                            project.Country || 'N/A'
-
-                          )}
-
-                        </TableCell>
-
-                        <TableCell>
-
-                          <Badge variant={statusVariant[project.status] ?? 'info'}>
-
-                            {project.status}
-
-                          </Badge>
-
-                        </TableCell>
-
-                        <TableCell>
-
-                          {project.request_date
-
-                            ? format(new Date(project.request_date), 'dd MMM yyyy', { locale: it })
-
-                            : '—'}
-
-                        </TableCell>
-
-                        <TableCell>{project.client_name}</TableCell>
-
-                        <TableCell>{project.agent_name}</TableCell>
-
-                        <TableCell>{project.project_name}</TableCell>
-
-                        <TableCell className="font-semibold">
-
-                          € {Number(project.value ?? 0).toLocaleString('it-IT')}
-
-                        </TableCell>
-
-                        <TableCell>
-
-                          {project.pdf_url ? (
-
-                            <a
-
-                              href={project.pdf_url}
-
-                              target="_blank"
-
-                              rel="noreferrer"
-
-                              className="text-primary hover:underline"
-
-                              onClick={(e) => e.stopPropagation()}
-
-                            >
-
-                              <FileText className="h-5 w-5" />
-
-                            </a>
-
-                          ) : (
-
-                            <span className="text-xs text-slate-400">N/A</span>
-
-                          )}
-
-                        </TableCell>
-
-                      </TableRow>
-
-                    );
-
-                  })}
-
-                </TableBody>
-
-              </Table>
-
-            )}
-
-          </CardContent>
+                    </CardContent>
 
         </Card>
 
