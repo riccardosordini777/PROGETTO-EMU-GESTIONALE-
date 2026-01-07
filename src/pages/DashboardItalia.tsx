@@ -77,6 +77,7 @@ async function fetchProfiles(): Promise<Profile[]> {
 
 export function DashboardItalia() {
   const { username, sessionUserId, localUserId, signOut } = useAuth()
+  console.log('[DashboardItalia] Rendered with localUserId:', localUserId)
   const queryClient = useQueryClient()
   const [sheetOpen, setSheetOpen] = useState(false)
   const [editing, setEditing] = useState<Project | null>(null)
@@ -441,6 +442,7 @@ function ProjectSheet({
   localUserId,
   onSaved,
 }: ProjectSheetProps) {
+  console.log('[ProjectSheet] Rendering with localUserId prop:', localUserId)
   const isEditing = Boolean(project)
   const [form, setForm] = useState<Project>(
     project ?? {
@@ -501,6 +503,7 @@ function ProjectSheet({
     try {
       if (!localUserId) throw new Error('User not authenticated for saving.')
       const payload = { ...form, user_id: localUserId }
+      console.log('[ProjectSheet] Submitting project with payload:', payload)
       const { error } = await supabase.from('projects').upsert(payload)
       if (error) throw error
       onSaved()
