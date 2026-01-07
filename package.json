@@ -23,6 +23,7 @@
     "react-dom": "^19.2.0",
     "react-leaflet": "^5.0.0",
     "react-router-dom": "^7.11.0",
+    "react-simple-maps": "^3.0.0",
     "react-tooltip": "^5.30.0",
     "recharts": "^2.12.7",
     "tailwind-merge": "^2.5.5"
@@ -32,6 +33,7 @@
     "@types/node": "^24.10.1",
     "@types/react": "^19.2.5",
     "@types/react-dom": "^19.2.3",
+    "@types/react-simple-maps": "^3.0.6",
     "@vitejs/plugin-react": "^5.1.1",
     "autoprefixer": "^10.4.20",
     "eslint": "^9.39.1",
