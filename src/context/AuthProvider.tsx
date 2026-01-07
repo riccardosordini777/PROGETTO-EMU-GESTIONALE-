@@ -90,6 +90,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error('Autenticazione Supabase fallita: utente non trovato.')
     }
 
+    // Ensure a profile exists for this user
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .upsert({ user_id: localUserId, username: nextUsername }, { onConflict: 'user_id' })
+
+    if (profileError) {
+      console.error('Error saving profile:', profileError)
+      throw new Error('Errore durante il salvataggio del profilo utente.')
+    }
+
     // If Supabase login is successful, proceed with the "simple login" experience
     setSessionUserId(data.user.id)
     setSessionUserEmail(data.user.email ?? null)
