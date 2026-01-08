@@ -38,9 +38,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (session) {
         setSessionUserId(session.user.id)
         setSessionUserEmail(session.user.email ?? null)
-        // IMPORTANT: Do not set authenticated here.
-        // Authentication must happen through the signIn function to ensure
-        // the user profile is created.
       }
     })
 
@@ -91,14 +88,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error('Autenticazione Supabase fallita: utente non trovato.')
     }
 
-    // Ensure a profile exists for this user
+    // Explicitly check if profile exists, then insert if it doesn't
     const { data: existingProfile, error: selectError } = await supabase
       .from('profiles')
       .select('id')
       .eq('id', localUserId)
       .single()
 
-    if (selectError && selectError.code !== 'PGRST116') {
+    if (selectError && selectError.code !== 'PGRST116') { // PGRST116 means row not found, which is fine
       console.error('Error checking for profile:', selectError)
       throw new Error('Errore durante la verifica del profilo utente.')
     }
