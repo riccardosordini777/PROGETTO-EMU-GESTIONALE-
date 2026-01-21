@@ -74,13 +74,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error('Le credenziali di servizio non sono configurate nel file .env')
     }
 
+    // Step 1: Supabase authentication
     const { data, error: supabaseError } = await supabase.auth.signInWithPassword({
       email: serviceEmail,
       password: servicePassword,
     })
 
     if (supabaseError) {
-      console.error('Supabase sign-in error:', supabaseError)
       throw new Error("Errore interno durante l'autenticazione. Riprova.")
     }
 
@@ -88,33 +88,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error('Autenticazione Supabase fallita: utente non trovato.')
     }
 
-    // Explicitly check if profile exists, then insert if it doesn't
-    const { data: existingProfile, error: selectError } = await supabase
+    // Step 2: Create or update profile
+    // Use upsert with onConflict to safely handle both creation and updates without race conditions
+    const { error: upsertError } = await supabase
       .from('profiles')
-      .select('id')
-      .eq('id', localUserId)
-      .single()
+      .upsert(
+        {
+          id: localUserId,
+          full_name: nextUsername,
+          email: `${localUserId}@emu.local`,
+          mood_status: null,
+          updated_at: new Date().toISOString()
+        },
+        { onConflict: 'id' }
+      )
 
-    if (selectError && selectError.code !== 'PGRST116') { // PGRST116 means row not found, which is fine
-      console.error('Error checking for profile:', selectError)
-      throw new Error('Errore durante la verifica del profilo utente.')
-    }
-    
-    if (!existingProfile) {
-      // Profile does not exist, create it
-      const { error: insertError } = await supabase.from('profiles').insert({
-        id: localUserId,
-        full_name: nextUsername,
-        email: `${localUserId}@email.placeholder`,
-      })
-
-      if (insertError) {
-        console.error('Error creating profile:', insertError)
-        throw new Error('Errore durante la creazione del profilo utente.')
-      }
+    if (upsertError) {
+      throw new Error(`Errore creazione/aggiornamento profilo: ${upsertError.message}`)
     }
 
-    // If Supabase login is successful, proceed with the "simple login" experience
+    // Step 3: Login successful - update local state
     setSessionUserId(data.user.id)
     setSessionUserEmail(data.user.email ?? null)
     localStorage.setItem(LS_USERNAME, nextUsername)
@@ -124,7 +117,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const signOut = async () => {
-    // Also sign out from Supabase
     await supabase.auth.signOut()
     localStorage.removeItem(LS_AUTH)
     localStorage.removeItem(LS_USERNAME)

@@ -57,6 +57,7 @@ export function AuthScreen() {
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   className="pl-9"
+                  autoComplete="username"
                 />
               </div>
             </div>
@@ -72,6 +73,7 @@ export function AuthScreen() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="pl-9"
+                  autoComplete="current-password"
                 />
               </div>
             </div>
@@ -89,4 +91,3 @@ export function AuthScreen() {
     </div>
   )
 }
-

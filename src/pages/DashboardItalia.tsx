@@ -382,7 +382,7 @@ function VibeSelector({ activeMood }: { activeMood: MoodStatus | string | null }
           email: `${localUserId}@email.placeholder`, // Ensure email is not null
           mood_status: mood,
           updated_at: new Date().toISOString(),
-        })
+        }, { onConflict: 'id' })
       if (error) throw error
       return mood
     },
