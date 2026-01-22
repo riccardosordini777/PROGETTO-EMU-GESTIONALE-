@@ -37,6 +37,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '
 import { Textarea } from '../components/ui/textarea'
 import { cn } from '../lib/utils'
 import { supabase } from '../lib/supabaseClient'
+import { dataService } from '../lib/dataService'
 import { useAuth } from '../context/AuthProvider'
 import type { MoodStatus, Profile, Project } from '../types'
 import { KpiCard } from '../components/KpiCard'
@@ -51,28 +52,13 @@ const statusVariant: Record<string, 'success' | 'danger' | 'info' | 'warning'> =
 }
 
 async function fetchItaliaProjects(): Promise<Project[]> {
-  const { data, error } = await supabase
-    .from('projects')
-    .select('*')
-    .is('Country', null)
-    .order('created_at', { ascending: false })
-  if (error) {
-    console.error('fetchItaliaProjects error', error)
-    throw error
-  }
-  return (data ?? []) as Project[]
+  return dataService.getProjects(null, null);
 }
 
 async function fetchProfiles(): Promise<Profile[]> {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .order('updated_at', { ascending: false })
-  if (error) {
-    console.error('fetchProfiles error', error)
-    throw error
-  }
-  return (data ?? []) as Profile[]
+  const { turso } = await import('../lib/tursoClient');
+  const result = await turso.execute("SELECT * FROM profiles ORDER BY updated_at DESC");
+  return result.rows as unknown as Profile[];
 }
 
 export function DashboardItalia() {
@@ -96,35 +82,16 @@ export function DashboardItalia() {
   }, [profiles, localUserId])
 
   useEffect(() => {
-    const channel = supabase
-      .channel('projects-channel')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'projects' },
-        () => queryClient.invalidateQueries({ queryKey: ['projects'] })
-      )
-      .subscribe()
+    const interval = setInterval(() => {
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+      queryClient.invalidateQueries({ queryKey: ['profiles'] });
+    }, 30000);
 
-    const profileChannel = supabase
-      .channel('profiles-channel')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'profiles' },
-        () => queryClient.invalidateQueries({ queryKey: ['profiles'] })
-      )
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(channel)
-      supabase.removeChannel(profileChannel)
-    }
+    return () => clearInterval(interval);
   }, [queryClient])
 
   const filteredProjects = useMemo(() => {
-    return projects.filter(() => {
-      // For now, no specific filtering beyond initial fetch for Italia
-      return true
-    })
+    return projects.filter(() => true)
   }, [projects])
 
   const pipelineValue = projects
@@ -374,16 +341,13 @@ function VibeSelector({ activeMood }: { activeMood: MoodStatus | string | null }
   const mutation = useMutation({
     mutationFn: async (mood: MoodStatus) => {
       if (!localUserId) throw new Error('User not authenticated')
-      const { error } = await supabase
-        .from('profiles')
-        .upsert({
-          id: localUserId,
-          full_name: username ?? 'Operatore',
-          email: `${localUserId}@email.placeholder`, // Ensure email is not null
-          mood_status: mood,
-          updated_at: new Date().toISOString(),
-        }, { onConflict: 'id' })
-      if (error) throw error
+      await dataService.upsertProfile({
+        id: localUserId,
+        full_name: username ?? 'Operatore',
+        email: `${localUserId}@emu.local`,
+        mood_status: mood,
+        updated_at: new Date().toISOString(),
+      })
       return mood
     },
     onSuccess: async () => {
@@ -501,24 +465,12 @@ function ProjectSheet({
     try {
       if (!localUserId) throw new Error('User not authenticated for saving.')
       const payload = { ...form, user_id: localUserId }
-      const { error } = await supabase.from('projects').upsert(payload)
-      if (error) throw error
+      await dataService.saveProject(payload)
       onSaved()
       onOpenChange(false)
     } catch (err) {
       console.error(err)
-      const e = err as { message?: string; details?: string; hint?: string; code?: string }
-      alert(
-        [
-          'Errore durante il salvataggio del progetto',
-          e.code ? `code: ${e.code}` : null,
-          e.message ? `message: ${e.message}` : null,
-          e.details ? `details: ${e.details}` : null,
-          e.hint ? `hint: ${e.hint}` : null,
-        ]
-          .filter(Boolean)
-          .join('\n')
-      )
+      alert('Errore durante il salvataggio del progetto')
     } finally {
       setSaving(false)
     }
@@ -526,14 +478,14 @@ function ProjectSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetHeader>
-        <SheetTitle>{isEditing ? 'Modifica progetto' : 'Nuovo progetto'}</SheetTitle>
-        <SheetDescription>
-          Aggiorna lo stato, allega PDF e aggiungi note operative per l&apos;automazione.
-        </SheetDescription>
-      </SheetHeader>
       <SheetContent>
-        <form className="space-y-4" onSubmit={handleSubmit}>
+        <SheetHeader>
+          <SheetTitle>{isEditing ? 'Modifica progetto' : 'Nuovo progetto'}</SheetTitle>
+          <SheetDescription>
+            Aggiorna lo stato, allega PDF e aggiungi note operative per l&apos;automazione.
+          </SheetDescription>
+        </SheetHeader>
+        <form className="space-y-4 pt-4" onSubmit={handleSubmit}>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label>Status</Label>

@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { supabase } from '../lib/supabaseClient'
+import { dataService } from '../lib/dataService'
 
 interface AuthContextValue {
   authenticated: boolean
@@ -88,23 +89,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error('Autenticazione Supabase fallita: utente non trovato.')
     }
 
-    // Step 2: Create or update profile
-    // Use upsert with onConflict to safely handle both creation and updates without race conditions
-    const { error: upsertError } = await supabase
-      .from('profiles')
-      .upsert(
-        {
-          id: localUserId,
-          full_name: nextUsername,
-          email: `${localUserId}@emu.local`,
-          mood_status: null,
-          updated_at: new Date().toISOString()
-        },
-        { onConflict: 'id' }
-      )
-
-    if (upsertError) {
-      throw new Error(`Errore creazione/aggiornamento profilo: ${upsertError.message}`)
+    // Step 2: Create or update profile in Turso
+    try {
+      await dataService.upsertProfile({
+        id: localUserId,
+        full_name: nextUsername,
+        email: `${localUserId}@emu.local`,
+        mood_status: null,
+        updated_at: new Date().toISOString()
+      });
+    } catch (err: any) {
+      throw new Error(`Errore creazione/aggiornamento profilo su Turso: ${err.message}`);
     }
 
     // Step 3: Login successful - update local state

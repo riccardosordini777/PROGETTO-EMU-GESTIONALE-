@@ -38,6 +38,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '
 import { Textarea } from '../components/ui/textarea'
 import { getCountryCode, normalizeCountryName } from '../lib/utils'
 import { supabase } from '../lib/supabaseClient'
+import { dataService } from '../lib/dataService'
 import { useAuth } from '../context/AuthProvider'
 import type { Project } from '../types'
 import { KpiCard } from '../components/KpiCard'
@@ -52,16 +53,9 @@ const statusVariant: Record<string, 'success' | 'danger' | 'info' | 'warning'> =
 }
 
 async function fetchEsteroProjects(): Promise<Project[]> {
-  const { data, error } = await supabase
-    .from('projects')
-    .select('*')
-    .not('Country', 'is', null)
-    .order('created_at', { ascending: false })
-  if (error) {
-    console.error('fetchEsteroProjects error', error)
-    throw error
-  }
-  return (data ?? []) as Project[]
+  // Passiamo userId = null per vedere i progetti di tutti
+  // Passiamo countryFilter = undefined per prendere tutti quelli che HANNO un paese (IS NOT NULL)
+  return dataService.getProjects(null, undefined);
 }
 
 export function DashboardEstero() {
@@ -90,18 +84,12 @@ export function DashboardEstero() {
   }, [selectedCountry, projects]);
 
   useEffect(() => {
-    const channel = supabase
-      .channel('projects-channel-estero')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'projects' },
-        () => queryClient.invalidateQueries({ queryKey: ['projectsEstero'] })
-      )
-      .subscribe()
+    // Polling ogni 30 secondi per aggiornare i dati
+    const interval = setInterval(() => {
+      queryClient.invalidateQueries({ queryKey: ['projectsEstero'] });
+    }, 30000);
 
-    return () => {
-      supabase.removeChannel(channel)
-    }
+    return () => clearInterval(interval);
   }, [queryClient])
 
   const projectsByCountry = useMemo(() => {
@@ -504,15 +492,13 @@ function ProjectSheetEstero({
     try {
       if (!localUserId) throw new Error('User not authenticated for saving.')
       const payload = { ...form, user_id: localUserId }
-      const { error } = await supabase.from('projects').upsert(payload)
-      if (error) {
-        throw error
-      }
+      
+      await dataService.saveProject(payload);
 
       onSaved()
       onOpenChange(false)
     } catch (err) {
-      console.error('Supabase upsert error:', err)
+      console.error('Save error:', err)
       const e = err as { message?: string; details?: string; hint?: string; code?: string }
       alert(
         [
