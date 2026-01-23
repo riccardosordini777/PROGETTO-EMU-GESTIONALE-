@@ -21,5 +21,6 @@ export interface Project {
   notes?: string | null
   pdf_url?: string | null
   Country?: string | null
+  region?: string | null
 }
 

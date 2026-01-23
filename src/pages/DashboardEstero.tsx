@@ -18,6 +18,7 @@ import {
   ZoomableGroup,
 } from 'react-simple-maps'
 import { Tooltip as ReactTooltip } from 'react-tooltip'
+import { motion } from 'framer-motion'
 
 import { Button } from '../components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
@@ -56,6 +57,28 @@ async function fetchEsteroProjects(): Promise<Project[]> {
   // Passiamo userId = null per vedere i progetti di tutti
   // Passiamo countryFilter = undefined per prendere tutti quelli che HANNO un paese (IS NOT NULL)
   return dataService.getProjects(null, undefined);
+}
+
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1,
+    },
+  },
+}
+
+const itemVariants = {
+  hidden: { y: 20, opacity: 0 },
+  visible: {
+    y: 0,
+    opacity: 1,
+    transition: {
+      type: 'spring',
+      stiffness: 100,
+    },
+  },
 }
 
 export function DashboardEstero() {
@@ -179,46 +202,62 @@ export function DashboardEstero() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/80 backdrop-blur-lg">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-          <div className="flex items-center gap-3">
-            <img src="/emu.1.png" alt="EMU" className="h-10" />
+    <div className="min-h-screen pb-20">
+      <header className="sticky top-0 z-30 border-b border-white/20 bg-white/60 backdrop-blur-xl shadow-sm">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
+          <div className="flex items-center gap-4">
+            <div className="relative">
+              <div className="absolute inset-0 blur-lg bg-blue-400/30 rounded-full" />
+              <img src="/emu.1.png" alt="EMU" className="relative h-12 hover:scale-105 transition-transform duration-300" />
+            </div>
             <div>
-              <p className="text-xs uppercase tracking-[0.18em] text-primary font-semibold">
+              <p className="text-xs uppercase tracking-[0.2em] text-primary font-bold drop-shadow-sm">
                 EMU Foreign Hub
               </p>
-              <p className="text-sm text-slate-600">Control room progetti internazionali</p>
+              <p className="text-sm text-slate-600 font-medium">Control room progetti internazionali</p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="text-right">
-              <p className="text-sm font-semibold text-slate-900">
+          <div className="flex items-center gap-4">
+            <div className="text-right hidden sm:block">
+              <p className="text-sm font-bold text-slate-800">
                 {username ?? 'Operatore'}
               </p>
-              <p className="text-xs text-slate-500">Accesso protetto</p>
+              <div className="flex items-center justify-end gap-1.5">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                </span>
+                <p className="text-[10px] uppercase tracking-wider text-emerald-600 font-bold">Secure</p>
+              </div>
             </div>
             <Avatar name={username ?? 'User'} />
-            <Button variant="outline" size="sm" onClick={() => signOut()}>
+            <Button variant="outline" size="sm" onClick={() => signOut()} className="border-slate-200 bg-white/50 hover:bg-white hover:text-red-600 transition-colors">
               <LogOut className="h-4 w-4" />
-              Esci
             </Button>
           </div>
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl space-y-8 px-6 py-8">
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-2 text-sm text-primary font-semibold">
+      <motion.main
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+        className="mx-auto max-w-7xl space-y-8 px-6 py-10"
+      >
+        <motion.div variants={itemVariants}>
+        <Card className="border-blue-100/50">
+          <CardHeader className="flex flex-col gap-1 border-b border-slate-100/50 pb-4">
+            <div className="flex items-center gap-2 text-sm text-primary font-bold uppercase tracking-wider">
               <Globe className="h-4 w-4" />
               Mappa Progetti
             </div>
-            <CardTitle className="text-2xl">Distribuzione Globale</CardTitle>
+            <CardTitle className="text-3xl bg-clip-text text-transparent bg-gradient-to-r from-slate-900 to-blue-800">
+              Distribuzione Globale
+            </CardTitle>
           </CardHeader>
-          <CardContent className="p-0 overflow-hidden rounded-b-lg">
-            <div className="relative w-full" style={{ paddingTop: '56.25%', backgroundColor: '#E6EEF5' }}>
-              <ReactTooltip id="map-tooltip" />
+          <CardContent className="p-0 overflow-hidden rounded-b-2xl">
+            <div className="relative w-full border-t border-white/50" style={{ paddingTop: '56.25%', backgroundColor: 'rgba(230, 238, 245, 0.5)' }}>
+              <ReactTooltip id="map-tooltip" style={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', borderRadius: '8px', fontSize: '12px' }} />
               <ComposableMap
                 projectionConfig={{
                   rotate: [-10, 0, 0],
@@ -235,13 +274,17 @@ export function DashboardEstero() {
               >
                 <ZoomableGroup zoom={position.zoom} center={position.coordinates} onMoveEnd={handleMoveEnd}>
                   <Geographies geography={geoUrl}>
-                    {({ geographies }) =>
+                    {({
+                      geographies
+                    }) =>
                       geographies
                         .filter(geo => geo.properties.name !== "Antarctica")
                         .map((geo) => {
                           const countryName = normalizeCountryName(geo.properties.name);
                           const projectCount = projectsByCountry[countryName] || 0;
-                          const fillColor = projectCount > 0 ? colorScale(projectCount) : '#D9D9D9';
+                          const fillColor = projectCount > 0 ? colorScale(projectCount) : '#CBD5E1';
+                          const isSelected = countryName === selectedCountry;
+                          
                           return (
                             <Geography
                               key={geo.rsmKey}
@@ -257,21 +300,23 @@ export function DashboardEstero() {
                               }}
                               style={{
                                 default: {
-                                  fill: fillColor,
+                                  fill: isSelected ? '#F59E0B' : fillColor,
                                   stroke: '#ffffff',
                                   strokeWidth: 0.5,
                                   outline: 'none',
+                                  transition: 'all 0.3s ease',
                                 },
                                 hover: {
-                                  fill: '#F5A623',
+                                  fill: '#F59E0B',
                                   stroke: '#ffffff',
-                                  strokeWidth: 0.75,
+                                  strokeWidth: 1,
                                   outline: 'none',
+                                  cursor: 'pointer',
                                 },
                                 pressed: {
-                                  fill: '#F5A623',
+                                  fill: '#D97706',
                                   stroke: '#ffffff',
-                                  strokeWidth: 0.75,
+                                  strokeWidth: 1,
                                   outline: 'none',
                                 },
                               }}
@@ -284,113 +329,127 @@ export function DashboardEstero() {
               </ComposableMap>
 
               {selectedCountryData && (
-                <div className="absolute top-4 left-4 bg-white/80 backdrop-blur-sm p-3 rounded-lg shadow-lg transition-all z-30">
-                  <h3 className="font-bold text-lg">{selectedCountryData.name}</h3>
-                  <p className="text-sm">Fatturato Totale: € {selectedCountryData.totalValue.toLocaleString('it-IT')}</p>
-                  <p className="text-sm">N. Progetti: {selectedCountryData.projectCount}</p>
-                </div>
+                <motion.div 
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  className="absolute top-4 left-4 bg-white/90 backdrop-blur-md p-4 rounded-xl shadow-lg border border-white/50 z-30 min-w-[200px]"
+                >
+                  <h3 className="font-bold text-lg text-slate-800 border-b border-slate-200 pb-2 mb-2">{selectedCountryData.name}</h3>
+                  <div className="space-y-1">
+                    <p className="text-xs text-slate-500 uppercase tracking-wider">Fatturato Totale</p>
+                    <p className="text-lg font-bold text-blue-600">€ {selectedCountryData.totalValue.toLocaleString('it-IT')}</p>
+                    <p className="text-xs text-slate-500 uppercase tracking-wider mt-2">Progetti Attivi</p>
+                    <p className="text-lg font-bold text-slate-800">{selectedCountryData.projectCount}</p>
+                  </div>
+                </motion.div>
               )}
 
               <div className="absolute bottom-4 right-4 flex flex-col gap-2">
-                <Button onClick={handleZoomIn} size="sm" className="h-8 w-8">
+                <Button onClick={handleZoomIn} size="sm" className="h-8 w-8 rounded-full shadow-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-200">
                   +
                 </Button>
-                <Button onClick={handleZoomOut} size="sm" className="h-8 w-8">
+                <Button onClick={handleZoomOut} size="sm" className="h-8 w-8 rounded-full shadow-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-200">
                   -
                 </Button>
                 {selectedCountry && (
-                  <Button onClick={() => setSelectedCountry(null)} size="sm" variant="outline" className="mt-2 text-xs">
-                    Reset Filter
+                  <Button onClick={() => setSelectedCountry(null)} size="sm" variant="outline" className="mt-2 text-xs bg-white/90 backdrop-blur-sm shadow-md border-blue-200 text-blue-600 hover:bg-blue-50">
+                    Reset Filtro
                   </Button>
                 )}
               </div>
             </div>
           </CardContent>
         </Card>
+        </motion.div>
         
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+        <motion.div variants={itemVariants} className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
             <KpiCard title="Total Pipeline" value={pipelineValue} description="Open + Negotiation" />
             <KpiCard title={`Top Country: ${topCountry.name}`} value={topCountry.value} description="Highest value country" />
             <KpiCard title="Projects Won (mese)" value={projectsWonThisMonth} description="Successi recenti" suffix="progetti" />
             <KpiCard title="Progetti Attivi" value={activeCount} description="Non persi" suffix="attivi" />
-        </div>
+        </motion.div>
 
-        <Card>
-          <CardHeader>
+        <motion.div variants={itemVariants}>
+        <Card className="border-blue-100/50">
+          <CardHeader className="flex flex-col gap-4 border-b border-slate-100/50 pb-6">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">
-                  Projects Grid
+                <p className="text-xs font-bold uppercase tracking-[0.2em] text-primary mb-1">
+                  Database Progetti
                 </p>
-                <CardTitle className="text-2xl">Pipeline progetti internazionali</CardTitle>
+                <CardTitle className="text-2xl text-slate-800">Pipeline progetti internazionali</CardTitle>
               </div>
-              <Button onClick={handleNewProject}>
-                <Plus className="h-4 w-4" />
+              <Button onClick={handleNewProject} className="bg-primary hover:bg-blue-700 text-white shadow-lg shadow-blue-500/30 transition-all hover:scale-105 rounded-full px-6">
+                <Plus className="h-4 w-4 mr-2" />
                 Nuovo progetto
               </Button>
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-0">
             {projectsLoading ? (
-              <p className="text-sm text-slate-500">Caricamento progetti...</p>
+              <div className="p-12 text-center text-slate-500 animate-pulse">Caricamento progetti...</div>
             ) : (
               <Table>
-                <TableHeader>
-                  <tr>
-                    <TableHead>Paese</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Request Date</TableHead>
-                    <TableHead>Client</TableHead>
-                    <TableHead>Agent</TableHead>
-                    <TableHead>Project</TableHead>
-                    <TableHead>Value (€)</TableHead>
-                    <TableHead>PDF</TableHead>
-                  </tr>
+                <TableHeader className="bg-slate-50/50">
+                  <TableRow className="hover:bg-transparent border-slate-100">
+                    <TableHead className="font-bold text-slate-700">Paese</TableHead>
+                    <TableHead className="font-bold text-slate-700">Status</TableHead>
+                    <TableHead className="font-bold text-slate-700">Request Date</TableHead>
+                    <TableHead className="font-bold text-slate-700">Client</TableHead>
+                    <TableHead className="font-bold text-slate-700">Agent</TableHead>
+                    <TableHead className="font-bold text-slate-700">Project</TableHead>
+                    <TableHead className="font-bold text-slate-700">Value (€)</TableHead>
+                    <TableHead className="font-bold text-slate-700 text-center">PDF</TableHead>
+                  </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredProjects.map((project) => {
                     const countryCode = getCountryCode(project.Country || '');
                     return (
-                      <TableRow key={project.id} onClick={() => handleRowClick(project)}>
+                      <TableRow 
+                        key={project.id} 
+                        onClick={() => handleRowClick(project)}
+                        className="cursor-pointer transition-colors hover:bg-blue-50/50 group border-slate-100"
+                      >
                         <TableCell>
                           {countryCode ? (
-                            <span className="flex items-center gap-2">
-                              <ReactCountryFlag countryCode={countryCode} svg />
+                            <span className="flex items-center gap-2 font-medium text-slate-700">
+                              <ReactCountryFlag countryCode={countryCode} svg className="drop-shadow-sm" />
                               {project.Country}
                             </span>
                           ) : (
-                            project.Country || 'N/A'
+                            <span className="text-slate-500">{project.Country || 'N/A'}</span>
                           )}
                         </TableCell>
                         <TableCell>
-                          <Badge variant={statusVariant[project.status] ?? 'info'}>
+                          <Badge variant={statusVariant[project.status] ?? 'info'} className="shadow-sm">
                             {project.status}
                           </Badge>
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="text-slate-600 font-medium">
                           {project.request_date
                             ? format(new Date(project.request_date), 'dd MMM yyyy', { locale: it })
                             : '—'}
                         </TableCell>
-                        <TableCell>{project.client_name}</TableCell>
-                        <TableCell>{project.agent_name}</TableCell>
-                        <TableCell>{project.project_name}</TableCell>
-                        <TableCell className="font-semibold">
+                        <TableCell className="font-semibold text-slate-700">{project.client_name}</TableCell>
+                        <TableCell className="text-slate-600">{project.agent_name}</TableCell>
+                        <TableCell className="text-slate-600">{project.project_name}</TableCell>
+                        <TableCell className="font-bold text-slate-800 tabular-nums">
                           € {Number(project.value ?? 0).toLocaleString('it-IT')}
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="text-center">
                           {project.pdf_url ? (
                             <a
                               href={project.pdf_url}
                               target="_blank"
                               rel="noreferrer"
-                              className="text-primary hover:underline"
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-red-50 text-red-500 hover:bg-red-100 hover:scale-110 transition-all"
                               onClick={(e) => e.stopPropagation()}
                             >
-                              <FileText className="h-5 w-5" />
+                              <FileText className="h-4 w-4" />
                             </a>
                           ) : (
-                            <span className="text-xs text-slate-400">N/A</span>
+                            <span className="text-xs text-slate-300 font-medium">—</span>
                           )}
                         </TableCell>
                       </TableRow>
@@ -401,7 +460,8 @@ export function DashboardEstero() {
             )}
           </CardContent>
         </Card>
-      </main>
+        </motion.div>
+      </motion.main>
 
       <ProjectSheetEstero
         open={sheetOpen}

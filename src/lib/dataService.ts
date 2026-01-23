@@ -68,8 +68,8 @@ export const dataService = {
       sql: `INSERT INTO projects (
               id, created_at, user_id, status, request_date, 
               client_name, agent_name, project_name, value, 
-              notes, pdf_url, \"Country\"
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              notes, pdf_url, "Country", region
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT (id) DO UPDATE SET 
               status = excluded.status,
               request_date = excluded.request_date,
@@ -79,7 +79,8 @@ export const dataService = {
               value = excluded.value,
               notes = excluded.notes,
               pdf_url = excluded.pdf_url,
-              \"Country\" = excluded.\"Country\"`,
+              "Country" = excluded."Country",
+              region = excluded.region`,
       args: [
         project.id,
         project.created_at || new Date().toISOString(),
@@ -92,10 +93,12 @@ export const dataService = {
         project.value,
         project.notes || null,
         project.pdf_url || null,
-        project.Country || null
+        project.Country || null,
+        project.region || null
       ]
     });
   },
+
 
   async deleteProject(id: string): Promise<void> {
     await turso.execute({
