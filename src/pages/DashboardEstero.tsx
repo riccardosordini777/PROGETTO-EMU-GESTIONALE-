@@ -39,7 +39,6 @@ import { Select } from '../components/ui/select'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '../components/ui/sheet'
 import { Textarea } from '../components/ui/textarea'
 import { getCountryCode, normalizeCountryName } from '../lib/utils'
-import { supabase } from '../lib/supabaseClient'
 import { dataService } from '../lib/dataService'
 import { useAuth } from '../context/AuthProvider'
 import type { Project } from '../types'
@@ -82,8 +81,32 @@ const itemVariants = {
   },
 }
 
+// Helper function per aprire i PDF
+const openPdf = async (projectId: string, existingUrl: string | null) => {
+  if (!existingUrl) return;
+  
+  if (existingUrl.startsWith('turso://')) {
+    try {
+      const doc = await dataService.getDocumentByProject(projectId);
+      if (doc) {
+        const win = window.open();
+        if (win) {
+          win.document.write(`<iframe src="${doc.file_data}" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>`);
+        }
+      } else {
+        alert("Documento non trovato nel database.");
+      }
+    } catch (e) {
+      console.error(e);
+      alert("Errore nel recupero del PDF.");
+    }
+  } else {
+    window.open(existingUrl, '_blank');
+  }
+}
+
 export function DashboardEstero() {
-  const { username, sessionUserId, localUserId, signOut } = useAuth()
+  const { username, localUserId, signOut } = useAuth()
   const queryClient = useQueryClient()
   const [sheetOpen, setSheetOpen] = useState(false)
   const [editing, setEditing] = useState<Project | null>(null)
@@ -468,7 +491,6 @@ export function DashboardEstero() {
         open={sheetOpen}
         onOpenChange={setSheetOpen}
         project={editing}
-        sessionUserId={sessionUserId}
         localUserId={localUserId}
         onSaved={() => queryClient.invalidateQueries({ queryKey: ['projectsEstero'] })}
       />
@@ -480,14 +502,12 @@ function ProjectSheetEstero({
   open,
   onOpenChange,
   project,
-  sessionUserId,
   localUserId,
   onSaved,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   project: Project | null
-  sessionUserId: string | null
   localUserId: string
   onSaved: () => void
 }) {
@@ -509,10 +529,12 @@ function ProjectSheetEstero({
   )
   const [uploading, setUploading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [pendingDoc, setPendingDoc] = useState<{ name: string, type: string, base64: string } | null>(null)
 
   useEffect(() => {
     if (project) {
       setForm(project)
+      setPendingDoc(null)
     } else {
       setForm({
         id: crypto.randomUUID(),
@@ -527,6 +549,7 @@ function ProjectSheetEstero({
         pdf_url: '',
         Country: '',
       })
+      setPendingDoc(null)
     }
   }, [project, localUserId, open])
 
@@ -586,22 +609,20 @@ function ProjectSheetEstero({
       if (!localUserId) throw new Error('User not authenticated for saving.')
       const payload = { ...form, user_id: localUserId }
       
+      // 1. Salviamo progetto
       await dataService.saveProject(payload);
+
+      // 2. Salviamo PDF se presente
+      if (pendingDoc) {
+        await dataService.saveDocument(payload.id, pendingDoc.name, pendingDoc.type, pendingDoc.base64);
+        setPendingDoc(null);
+      }
 
       onSaved()
       onOpenChange(false)
-    } catch (err) {
+    } catch (err: any) {
       console.error('Save error:', err)
-      const e = err as { message?: string; details?: string; hint?: string; code?: string }
-      alert(
-        [
-          'Errore durante il salvataggio del progetto. Controlla la console per i dettagli.',
-          `Message: ${e.message ?? 'N/A'}`,
-          `Details: ${e.details ?? 'N/A'}`,
-        ]
-          .filter(Boolean)
-          .join('\n')
-      )
+      alert(`Errore salvataggio: ${err.message || 'Sconosciuto'}`)
     } finally {
       setSaving(false)
     }

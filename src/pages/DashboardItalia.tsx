@@ -21,7 +21,6 @@ import {
   MapPin,
   Trash2,
   Lightbulb,
-  AlertCircle,
   ArrowRight
 } from 'lucide-react'
 import { format } from 'date-fns'
@@ -53,7 +52,6 @@ import { Select } from '../components/ui/select'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '../components/ui/sheet'
 import { Textarea } from '../components/ui/textarea'
 import { cn } from '../lib/utils'
-import { supabase } from '../lib/supabaseClient'
 import { dataService } from '../lib/dataService'
 import { useAuth } from '../context/AuthProvider'
 import type { MoodStatus, Profile, Project } from '../types'
@@ -109,8 +107,32 @@ const itemVariants = {
   },
 }
 
+// Helper function per aprire i PDF
+const openPdf = async (projectId: string, existingUrl: string | null) => {
+  if (!existingUrl) return;
+  
+  if (existingUrl.startsWith('turso://')) {
+    try {
+      const doc = await dataService.getDocumentByProject(projectId);
+      if (doc) {
+        const win = window.open();
+        if (win) {
+          win.document.write(`<iframe src="${doc.file_data}" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>`);
+        }
+      } else {
+        alert("Documento non trovato nel database.");
+      }
+    } catch (e) {
+      console.error(e);
+      alert("Errore nel recupero del PDF.");
+    }
+  } else {
+    window.open(existingUrl, '_blank');
+  }
+}
+
 export function DashboardItalia() {
-  const { username, sessionUserId, localUserId, signOut } = useAuth()
+  const { username, localUserId, signOut } = useAuth()
   const queryClient = useQueryClient()
   const [sheetOpen, setSheetOpen] = useState(false)
   const [vibeModalOpen, setVibeModalOpen] = useState(false)
@@ -635,7 +657,6 @@ export function DashboardItalia() {
         open={sheetOpen}
         onOpenChange={setSheetOpen}
         project={editing}
-        sessionUserId={sessionUserId}
         localUserId={localUserId}
         onSaved={() => queryClient.invalidateQueries({ queryKey: ['projects'] })}
       />
@@ -744,7 +765,6 @@ interface ProjectSheetProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   project: Project | null
-  sessionUserId: string | null
   localUserId: string
   onSaved: () => void
 }
@@ -753,7 +773,6 @@ function ProjectSheet({
   open,
   onOpenChange,
   project,
-  sessionUserId,
   localUserId,
   onSaved,
 }: ProjectSheetProps) {
@@ -821,29 +840,6 @@ function ProjectSheet({
       setUploading(false);
     }
     reader.readAsDataURL(file);
-  }
-
-  const openPdf = async (projectId: string, existingUrl: string | null) => {
-    if (!existingUrl) return;
-    
-    if (existingUrl.startsWith('turso://')) {
-      try {
-        const doc = await dataService.getDocumentByProject(projectId);
-        if (doc) {
-          const win = window.open();
-          if (win) {
-            win.document.write(`<iframe src="${doc.file_data}" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>`);
-          }
-        } else {
-          alert("Documento non trovato nel database.");
-        }
-      } catch (e) {
-        console.error(e);
-        alert("Errore nel recupero del PDF.");
-      }
-    } else {
-      window.open(existingUrl, '_blank');
-    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {

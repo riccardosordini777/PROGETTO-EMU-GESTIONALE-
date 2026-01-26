@@ -1,5 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { supabase } from '../lib/supabaseClient'
+import { createContext, useContext, useMemo, useState, type ReactNode } from 'react'
 import { dataService } from '../lib/dataService'
 
 interface AuthContextValue {
@@ -31,80 +30,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [authenticated, setAuthenticated] = useState(localStorage.getItem(LS_AUTH) === '1')
   const [username, setUsername] = useState<string | null>(localStorage.getItem(LS_USERNAME))
   const [localUserId] = useState<string>(() => getOrCreateLocalUserId())
-  const [sessionUserId, setSessionUserId] = useState<string | null>(null)
-  const [sessionUserEmail, setSessionUserEmail] = useState<string | null>(null)
-
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        setSessionUserId(session.user.id)
-        setSessionUserEmail(session.user.email ?? null)
-      }
-    })
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session) {
-        setSessionUserId(session.user.id)
-        setSessionUserEmail(session.user.email ?? null)
-      } else {
-        setSessionUserId(null)
-        setSessionUserEmail(null)
-        setAuthenticated(false)
-        localStorage.removeItem(LS_AUTH)
-        localStorage.removeItem(LS_USERNAME)
-      }
-    })
-
-    return () => {
-      subscription.unsubscribe()
-    }
-  }, [])
+  
+  // Per compatibilità, usiamo localUserId come sessionUserId dato che non abbiamo più un backend di auth esterno
+  const sessionUserId = localUserId
+  const sessionUserEmail = `${localUserId}@emu.local`
 
   const signIn = async (rawUsername: string, password: string) => {
     const nextUsername = rawUsername.trim()
     if (!nextUsername) throw new Error('Inserisci uno username.')
     if (password !== REQUIRED_PASSWORD) throw new Error('Password non corretta.')
 
-    // "Behind the scenes" Supabase login with shared credentials
-    const serviceEmail = import.meta.env.VITE_SERVICE_EMAIL
-    const servicePassword = import.meta.env.VITE_SERVICE_PASSWORD
-
-    if (!serviceEmail || !servicePassword) {
-      throw new Error('Le credenziali di servizio non sono configurate nel file .env')
-    }
-
-    // Step 1: Supabase authentication
-    const { data, error: supabaseError } = await supabase.auth.signInWithPassword({
-      email: serviceEmail,
-      password: servicePassword,
-    })
-
-    if (supabaseError) {
-      throw new Error("Errore interno durante l'autenticazione. Riprova.")
-    }
-
-    if (!data.user) {
-      throw new Error('Autenticazione Supabase fallita: utente non trovato.')
-    }
-
-    // Step 2: Create or update profile in Turso
+    // Crea o aggiorna il profilo su Turso
     try {
       await dataService.upsertProfile({
         id: localUserId,
         full_name: nextUsername,
-        email: `${localUserId}@emu.local`,
+        email: sessionUserEmail,
         mood_status: null,
         updated_at: new Date().toISOString()
       });
     } catch (err: any) {
-      throw new Error(`Errore creazione/aggiornamento profilo su Turso: ${err.message}`);
+      console.error("Errore profilo:", err);
+      // Non blocchiamo il login se Turso fallisce momentaneamente, l'utente può riprovare
     }
 
-    // Step 3: Login successful - update local state
-    setSessionUserId(data.user.id)
-    setSessionUserEmail(data.user.email ?? null)
+    // Login successful - update local state
     localStorage.setItem(LS_USERNAME, nextUsername)
     localStorage.setItem(LS_AUTH, '1')
     setUsername(nextUsername)
@@ -112,13 +62,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const signOut = async () => {
-    await supabase.auth.signOut()
     localStorage.removeItem(LS_AUTH)
     localStorage.removeItem(LS_USERNAME)
     setAuthenticated(false)
     setUsername(null)
-    setSessionUserId(null)
-    setSessionUserEmail(null)
   }
 
   const value = useMemo(
