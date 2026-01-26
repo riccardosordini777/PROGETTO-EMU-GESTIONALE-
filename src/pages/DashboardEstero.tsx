@@ -6,6 +6,7 @@ import {
   Plus,
   FileText,
   UploadCloud,
+  Trash2
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { it } from 'date-fns/locale'
@@ -439,15 +440,15 @@ export function DashboardEstero() {
                         </TableCell>
                         <TableCell className="text-center">
                           {project.pdf_url ? (
-                            <a
-                              href={project.pdf_url}
-                              target="_blank"
-                              rel="noreferrer"
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openPdf(project.id, project.pdf_url || null);
+                              }}
                               className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-red-50 text-red-500 hover:bg-red-100 hover:scale-110 transition-all"
-                              onClick={(e) => e.stopPropagation()}
                             >
                               <FileText className="h-4 w-4" />
-                            </a>
+                            </button>
                           ) : (
                             <span className="text-xs text-slate-300 font-medium">—</span>
                           )}
@@ -530,19 +531,51 @@ function ProjectSheetEstero({
   }, [project, localUserId, open])
 
   const handleUpload = async (file: File) => {
+    if (file.size > 2 * 1024 * 1024) {
+      alert("Il file è troppo grande. Massimo 2MB per i PDF su database.");
+      return;
+    }
+
     setUploading(true)
     try {
-      if (!sessionUserId) throw new Error('User not authenticated for upload.')
-      const path = `${sessionUserId}/${Date.now()}-${file.name}`
-      const { error } = await supabase.storage.from('project-pdfs').upload(path, file)
-      if (error) throw error
-      const { data } = supabase.storage.from('project-pdfs').getPublicUrl(path)
-      setForm((prev) => ({ ...prev, pdf_url: data.publicUrl }))
-    } catch (err) {
-      console.error(err)
-      alert('Errore nel caricamento PDF')
-    } finally {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const base64 = e.target?.result as string;
+        if (!base64) throw new Error("Errore lettura file");
+        
+        await dataService.saveDocument(form.id, file.name, file.type, base64);
+        setForm((prev) => ({ ...prev, pdf_url: `turso://${form.id}` }));
+        setUploading(false);
+      };
+      reader.onerror = () => { throw new Error("Errore FileReader"); };
+      reader.readAsDataURL(file);
+    } catch (err: any) {
+      console.error('Upload error:', err)
+      alert(`Errore nel caricamento PDF: ${err.message || 'Errore sconosciuto'}`)
       setUploading(false)
+    }
+  }
+
+  const openPdf = async (projectId: string, existingUrl: string | null) => {
+    if (!existingUrl) return;
+    
+    if (existingUrl.startsWith('turso://')) {
+      try {
+        const doc = await dataService.getDocumentByProject(projectId);
+        if (doc) {
+          const win = window.open();
+          if (win) {
+            win.document.write(`<iframe src="${doc.file_data}" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>`);
+          }
+        } else {
+          alert("Documento non trovato nel database.");
+        }
+      } catch (e) {
+        console.error(e);
+        alert("Errore nel recupero del PDF.");
+      }
+    } else {
+      window.open(existingUrl, '_blank');
     }
   }
 
@@ -574,11 +607,40 @@ function ProjectSheetEstero({
     }
   }
 
+  const handleDelete = async () => {
+    if (!window.confirm('Eliminare definitivamente questo progetto internazionale?')) return
+    
+    setSaving(true)
+    try {
+      await dataService.deleteProject(form.id)
+      onSaved()
+      onOpenChange(false)
+    } catch (err) {
+      console.error(err)
+      alert('Errore durante l\'eliminazione')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="overflow-y-auto w-full max-w-2xl">
         <SheetHeader>
-          <SheetTitle>{isEditing ? 'Modifica progetto' : 'Nuovo progetto'}</SheetTitle>
+          <div className="flex items-center justify-between pr-8">
+            <SheetTitle>{isEditing ? 'Modifica progetto' : 'Nuovo progetto'}</SheetTitle>
+            {isEditing && (
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={handleDelete}
+                className="text-red-500 hover:text-red-700 hover:bg-red-50 gap-2"
+              >
+                <Trash2 className="h-4 w-4" />
+                Elimina
+              </Button>
+            )}
+          </div>
           <SheetDescription>
             Aggiorna lo stato, allega PDF e aggiungi note operative per l&apos;automazione.
           </SheetDescription>
@@ -678,9 +740,22 @@ function ProjectSheetEstero({
                 disabled={uploading}
               />
               {form.pdf_url && (
-                <a href={form.pdf_url} target="_blank" rel="noreferrer" className="text-primary">
-                  File caricato (clicca per aprire)
-                </a>
+                <button 
+                  type="button"
+                  onClick={() => {
+                    if (pendingDoc) {
+                      const win = window.open();
+                      if (win) {
+                        win.document.write(`<iframe src="${pendingDoc.base64}" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>`);
+                      }
+                    } else {
+                      openPdf(form.id, form.pdf_url || null);
+                    }
+                  }} 
+                  className="text-primary hover:underline text-left"
+                >
+                  File caricato (clicca per aprire) {pendingDoc ? '(da salvare)' : ''}
+                </button>
               )}
             </div>
           </div>

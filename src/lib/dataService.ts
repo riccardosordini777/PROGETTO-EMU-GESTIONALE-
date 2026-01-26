@@ -37,8 +37,22 @@ export const dataService = {
 
   // --- PROGETTI ---
   async getProjects(userId: string | null, countryFilter?: string | null): Promise<Project[]> {
+    // Inizializzazione automatica tabella documenti se non esiste
+    await turso.execute(`
+      CREATE TABLE IF NOT EXISTS project_documents (
+        id TEXT PRIMARY KEY,
+        project_id TEXT NOT NULL,
+        file_name TEXT NOT NULL,
+        mime_type TEXT NOT NULL,
+        file_data TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+      );
+    `).catch(() => {}); // Ignora se fallisce o esiste già
+
     let query = "SELECT * FROM projects WHERE 1=1";
     const args: any[] = [];
+    // ... rest of the code remains same
 
     // Se userId è specificato, filtra per utente (opzionale, in base alla logica di business)
     // Se vogliamo vedere TUTTI i progetti nella dashboard, passiamo userId = null
@@ -64,39 +78,54 @@ export const dataService = {
   },
 
   async saveProject(project: Project): Promise<void> {
-    await turso.execute({
-      sql: `INSERT INTO projects (
-              id, created_at, user_id, status, request_date, 
-              client_name, agent_name, project_name, value, 
-              notes, pdf_url, "Country", region
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT (id) DO UPDATE SET 
-              status = excluded.status,
-              request_date = excluded.request_date,
-              client_name = excluded.client_name,
-              agent_name = excluded.agent_name,
-              project_name = excluded.project_name,
-              value = excluded.value,
-              notes = excluded.notes,
-              pdf_url = excluded.pdf_url,
-              "Country" = excluded."Country",
-              region = excluded.region`,
-      args: [
-        project.id,
-        project.created_at || new Date().toISOString(),
-        project.user_id,
-        project.status,
-        project.request_date,
-        project.client_name,
-        project.agent_name,
-        project.project_name,
-        project.value,
-        project.notes || null,
-        project.pdf_url || null,
-        project.Country || null,
-        project.region || null
-      ]
-    });
+    const runSave = async () => {
+      await turso.execute({
+        sql: `INSERT INTO projects (
+                id, created_at, user_id, status, request_date, 
+                client_name, agent_name, project_name, value, 
+                notes, pdf_url, "Country", region
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              ON CONFLICT (id) DO UPDATE SET 
+                status = excluded.status,
+                request_date = excluded.request_date,
+                client_name = excluded.client_name,
+                agent_name = excluded.agent_name,
+                project_name = excluded.project_name,
+                value = excluded.value,
+                notes = excluded.notes,
+                pdf_url = excluded.pdf_url,
+                "Country" = excluded."Country",
+                region = excluded.region`,
+        args: [
+          project.id,
+          project.created_at || new Date().toISOString(),
+          project.user_id,
+          project.status,
+          project.request_date,
+          project.client_name,
+          project.agent_name,
+          project.project_name,
+          project.value,
+          project.notes || null,
+          project.pdf_url || null,
+          project.Country || null,
+          project.region || null
+        ]
+      });
+    };
+
+    try {
+      await runSave();
+    } catch (err: any) {
+      const msg = err.message || "";
+      if (msg.includes("no such column")) {
+        if (msg.includes("region")) await turso.execute("ALTER TABLE projects ADD COLUMN region TEXT");
+        if (msg.includes("Country")) await turso.execute("ALTER TABLE projects ADD COLUMN \"Country\" TEXT");
+        await runSave();
+      } else {
+        throw err;
+      }
+    }
   },
 
 
@@ -105,5 +134,25 @@ export const dataService = {
       sql: "DELETE FROM projects WHERE id = ?",
       args: [id]
     });
+  },
+
+  // --- DOCUMENTI (PDF su Turso) ---
+  async saveDocument(projectId: string, fileName: string, mimeType: string, base64Data: string): Promise<string> {
+    const id = crypto.randomUUID();
+    await turso.execute({
+      sql: `INSERT INTO project_documents (id, project_id, file_name, mime_type, file_data)
+            VALUES (?, ?, ?, ?, ?)`,
+      args: [id, projectId, fileName, mimeType, base64Data]
+    });
+    return id;
+  },
+
+  async getDocumentByProject(projectId: string): Promise<{ file_name: string, mime_type: string, file_data: string } | null> {
+    const rs = await turso.execute({
+      sql: "SELECT file_name, mime_type, file_data FROM project_documents WHERE project_id = ? ORDER BY created_at DESC LIMIT 1",
+      args: [projectId]
+    });
+    if (rs.rows.length === 0) return null;
+    return rs.rows[0] as unknown as { file_name: string, mime_type: string, file_data: string };
   }
 };

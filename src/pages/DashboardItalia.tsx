@@ -18,7 +18,11 @@ import {
   UploadCloud,
   Map as MapIcon,
   X,
-  MapPin
+  MapPin,
+  Trash2,
+  Lightbulb,
+  AlertCircle,
+  ArrowRight
 } from 'lucide-react'
 import { format } from 'date-fns'
 import { it } from 'date-fns/locale'
@@ -395,6 +399,82 @@ export function DashboardItalia() {
               description="Non persi"
               suffix="attivi"
             />
+
+            {/* EMU CLAIM CARD - "Signature" Style */}
+            <Card className="flex items-center justify-center p-10 border-blue-200/50 bg-slate-900/5 backdrop-blur-xl shadow-lg relative group overflow-hidden">
+              {/* Elemento decorativo sottile */}
+              <div className="absolute top-0 left-0 w-1.5 h-full bg-blue-600/40" />
+              
+              <div className="relative z-10 text-center">
+                <span className="text-4xl text-blue-400 font-serif absolute -top-6 -left-4 opacity-40">“</span>
+                <h2 className="text-2xl md:text-3xl font-serif italic text-slate-900 tracking-wide leading-relaxed">
+                  We think outside
+                </h2>
+                <span className="text-4xl text-blue-400 font-serif absolute -bottom-10 -right-2 opacity-40">”</span>
+                
+                <div className="mt-4 flex items-center justify-center gap-2">
+                  <div className="h-[1px] w-6 bg-blue-600/30" />
+                  <p className="text-[10px] uppercase tracking-[0.4em] text-blue-800/70 font-bold">
+                    EMU DESIGN
+                  </p>
+                  <div className="h-[1px] w-6 bg-blue-600/30" />
+                </div>
+              </div>
+            </Card>
+
+            {/* SMART TASKS - Opportunity Engine (Threshold > 30k) */}
+            <Card className="border-blue-100/50 bg-white/60 backdrop-blur-md shadow-lg">
+              <CardHeader className="pb-3 border-b border-white/50">
+                <div className="flex items-center gap-2 text-sm font-bold text-slate-800 uppercase tracking-wider">
+                  <Lightbulb className="h-4 w-4 text-amber-500" />
+                  Opportunity Engine
+                </div>
+              </CardHeader>
+              <CardContent className="pt-4 space-y-3">
+                {projects
+                  .filter(p => (p.status === 'Open' || p.status === 'Negotiation'))
+                  .sort((a, b) => (Number(b.value) || 0) - (Number(a.value) || 0))
+                  .slice(0, 3) 
+                  .map((task) => {
+                    let tip = "Pianifica follow-up";
+                    let tipColor = "text-slate-500";
+                    let tipBg = "bg-slate-100";
+                    
+                    // Soglia alzata a 30.000 € come richiesto
+                    if ((task.value || 0) >= 30000) {
+                      tip = "🔥 Alta Priorità: Supporto Chiusura";
+                      tipColor = "text-rose-700";
+                      tipBg = "bg-rose-50";
+                    } else if (task.status === 'Negotiation') {
+                      tip = "💡 Strategia: Richiedi Feedback";
+                      tipColor = "text-amber-700";
+                      tipBg = "bg-amber-50";
+                    } else {
+                      tip = "📨 Azione: Invio Presentazione";
+                      tipColor = "text-blue-700";
+                      tipBg = "bg-blue-50";
+                    }
+
+                    return (
+                      <div key={task.id} className="group relative p-3 rounded-xl bg-white/50 border border-white/60 hover:bg-white hover:shadow-md transition-all cursor-pointer" onClick={() => handleRowClick(task)}>
+                        <div className="flex justify-between items-start mb-1">
+                          <span className="font-bold text-slate-800 text-sm truncate max-w-[120px]">{task.client_name}</span>
+                          <span className="text-xs font-semibold text-slate-500">€ {(task.value || 0).toLocaleString()}</span>
+                        </div>
+                        <div className={`text-[10px] font-bold px-2 py-1 rounded-md w-fit flex items-center gap-1 ${tipBg} ${tipColor}`}>
+                          {tip}
+                        </div>
+                        <ArrowRight className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-300 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+                      </div>
+                    )
+                  })}
+                  {projects.filter(p => p.status === 'Open' || p.status === 'Negotiation').length === 0 && (
+                     <div className="text-center py-4 text-slate-500 text-sm">
+                       Nessuna priorità urgente. Pipeline pulita! 🎉
+                     </div>
+                  )}
+              </CardContent>
+            </Card>
           </motion.div>
         </div>
 
@@ -528,15 +608,15 @@ export function DashboardItalia() {
                       </TableCell>
                       <TableCell className="text-center">
                         {project.pdf_url ? (
-                          <a
-                            href={project.pdf_url}
-                            target="_blank"
-                            rel="noreferrer"
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openPdf(project.id, project.pdf_url || null);
+                            }}
                             className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-red-50 text-red-500 hover:bg-red-100 hover:scale-110 transition-all"
-                            onClick={(e) => e.stopPropagation()}
                           >
                             <FileText className="h-4 w-4" />
-                          </a>
+                          </button>
                         ) : (
                           <span className="text-xs text-slate-300 font-medium">—</span>
                         )}
@@ -695,10 +775,12 @@ function ProjectSheet({
   )
   const [uploading, setUploading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [pendingDoc, setPendingDoc] = useState<{ name: string, type: string, base64: string } | null>(null)
 
   useEffect(() => {
     if (project) {
       setForm(project)
+      setPendingDoc(null)
     } else {
       setForm({
         id: crypto.randomUUID(),
@@ -713,23 +795,54 @@ function ProjectSheet({
         pdf_url: '',
         region: '',
       })
+      setPendingDoc(null)
     }
   }, [project, localUserId, open])
 
   const handleUpload = async (file: File) => {
+    if (file.size > 2 * 1024 * 1024) {
+      alert("Il file è troppo grande. Massimo 2MB per i PDF su database.");
+      return;
+    }
+
     setUploading(true)
-    try {
-      if (!sessionUserId) throw new Error('User not authenticated for upload.')
-      const path = `${sessionUserId}/${Date.now()}-${file.name}`
-      const { error } = await supabase.storage.from('project-pdfs').upload(path, file)
-      if (error) throw error
-      const { data } = supabase.storage.from('project-pdfs').getPublicUrl(path)
-      setForm((prev) => ({ ...prev, pdf_url: data.publicUrl }))
-    } catch (err) {
-      console.error(err)
-      alert('Errore nel caricamento PDF')
-    } finally {
-      setUploading(false)
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const base64 = e.target?.result as string;
+      if (base64) {
+        // Salviamo in memoria in attesa del salvataggio progetto
+        setPendingDoc({ name: file.name, type: file.type, base64 });
+        setForm((prev) => ({ ...prev, pdf_url: `turso://${form.id}` }));
+      }
+      setUploading(false);
+    };
+    reader.onerror = () => {
+      alert("Errore lettura file");
+      setUploading(false);
+    }
+    reader.readAsDataURL(file);
+  }
+
+  const openPdf = async (projectId: string, existingUrl: string | null) => {
+    if (!existingUrl) return;
+    
+    if (existingUrl.startsWith('turso://')) {
+      try {
+        const doc = await dataService.getDocumentByProject(projectId);
+        if (doc) {
+          const win = window.open();
+          if (win) {
+            win.document.write(`<iframe src="${doc.file_data}" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>`);
+          }
+        } else {
+          alert("Documento non trovato nel database.");
+        }
+      } catch (e) {
+        console.error(e);
+        alert("Errore nel recupero del PDF.");
+      }
+    } else {
+      window.open(existingUrl, '_blank');
     }
   }
 
@@ -739,12 +852,37 @@ function ProjectSheet({
     try {
       if (!localUserId) throw new Error('User not authenticated for saving.')
       const payload = { ...form, user_id: localUserId }
+      
+      // 1. Salviamo PRIMA il progetto (crea l'ID nel DB)
       await dataService.saveProject(payload)
+      
+      // 2. SE c'è un documento in attesa, lo salviamo ora che il progetto esiste
+      if (pendingDoc) {
+        await dataService.saveDocument(payload.id, pendingDoc.name, pendingDoc.type, pendingDoc.base64);
+        setPendingDoc(null);
+      }
+      
+      onSaved()
+      onOpenChange(false)
+    } catch (err: any) {
+      console.error(err)
+      alert(`Errore durante il salvataggio: ${err.message || 'Sconosciuto'}`)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!window.confirm('Sei sicuro di voler eliminare definitivamente questo progetto? L\'azione non è reversibile.')) return
+    
+    setSaving(true)
+    try {
+      await dataService.deleteProject(form.id)
       onSaved()
       onOpenChange(false)
     } catch (err) {
       console.error(err)
-      alert('Errore durante il salvataggio del progetto')
+      alert('Errore durante l\'eliminazione del progetto')
     } finally {
       setSaving(false)
     }
@@ -754,11 +892,25 @@ function ProjectSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="w-full max-w-2xl overflow-y-auto">
         <SheetHeader>
-          <SheetTitle>{isEditing ? 'Modifica progetto' : 'Nuovo progetto'}</SheetTitle>
+          <div className="flex items-center justify-between pr-8">
+            <SheetTitle>{isEditing ? 'Modifica progetto' : 'Nuovo progetto'}</SheetTitle>
+            {isEditing && (
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={handleDelete}
+                className="text-red-500 hover:text-red-700 hover:bg-red-50 gap-2"
+              >
+                <Trash2 className="h-4 w-4" />
+                Elimina
+              </Button>
+            )}
+          </div>
           <SheetDescription>
             Aggiorna lo stato, allega PDF e aggiungi note operative per l\'automazione.
           </SheetDescription>
         </SheetHeader>
+
         <form className="space-y-4 pt-4" onSubmit={handleSubmit}>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div className="space-y-2">
@@ -845,7 +997,7 @@ function ProjectSheet({
                 <UploadCloud className="h-5 w-5 text-primary" />
                 <div>
                   <p className="font-semibold">Trascina e rilascia oppure scegli file</p>
-                  <p className="text-xs text-slate-500">PDF automaticamente salvato in Supabase</p>
+                  <p className="text-xs text-slate-500">PDF salvato nel Database sicuro</p>
                 </div>
               </div>
               <input
@@ -858,9 +1010,22 @@ function ProjectSheet({
                 disabled={uploading}
               />
               {form.pdf_url && (
-                <a href={form.pdf_url} target="_blank" rel="noreferrer" className="text-primary">
-                  File caricato (clicca per aprire)
-                </a>
+                <button 
+                  type="button"
+                  onClick={() => {
+                    if (pendingDoc) {
+                      const win = window.open();
+                      if (win) {
+                        win.document.write(`<iframe src="${pendingDoc.base64}" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>`);
+                      }
+                    } else {
+                      openPdf(form.id, form.pdf_url || null);
+                    }
+                  }} 
+                  className="text-primary hover:underline text-left"
+                >
+                  File caricato (clicca per aprire) {pendingDoc ? '(da salvare)' : ''}
+                </button>
               )}
             </div>
           </div>
